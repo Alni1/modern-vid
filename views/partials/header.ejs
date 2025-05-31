@@ -1,0 +1,29 @@
+<div id="box">
+  <a href="/" style="text-decoration: none; color: inherit;"><h2 id="a1">modernvid</h2></a>
+
+  <div id="header-search-nav">
+    <a href="/search?category=Education" class="header-category-link">Education</a>
+    <form action="/search" method="GET" id="header-search-form">
+      <input type="text" name="q" placeholder="Search by title..." id="header-search-input" class="header-search-control" value="<%= typeof query !== 'undefined' ? query : '' %>">
+      <button type="submit" id="header-search-button" class="header-search-control">Search</button>
+    </form>
+    <a href="/search?category=Entertainment" class="header-category-link">Entertainment</a>
+  </div>
+
+  <div id="a2">
+    <% if (typeof user !== 'undefined' && user) { %>
+      <a id="profile-link" href="/userprofile">
+        <% if (user.avatarUrl) { %>
+          <img src="<%= user.avatarUrl %>" alt="Avatar" style="width:40px; height:40px; border-radius:50%; object-fit:cover;" />
+        <% } %>
+        <div class="reg-log-button">Profile</div>
+      </a>
+      <form method="POST" action="/logout" style="display:inline;">
+        <button class="reg-log-button" type="submit">Sign out</button>
+      </form>
+    <% } else { %>
+      <a href="/login"><div class="reg-log-button">Login</div></a>
+      <a href="/registration"><div class="reg-log-button">Register</div></a>
+    <% } %>
+  </div>
+</div>

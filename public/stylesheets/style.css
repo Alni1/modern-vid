@@ -1,0 +1,1027 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,400;1,700;1,900&display=swap');
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Lato', sans-serif; /* Apply Lato globally if not already */
+    background-color: #f4f4f4; /* Consistent background for the page */
+}
+
+#box {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center; /* Changed from baseline to center */
+    width: 100%; /* Make header span full width */
+    height: 75px;
+    background-color: rgb(51, 51, 51);
+    font-family: 'Lato', sans-serif;
+    position: fixed; /* Keep header at the top */
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000; /* Ensure header is above other content */
+    justify-content: space-between; /* Ensure ModernVid, search, and profile are spaced out */
+}
+
+/* New styles for header search and navigation */
+#header-search-nav {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Space between category links and search form */
+    flex-grow: 1; /* Allow this section to take available space */
+    justify-content: center; /* Center the items within this container */
+}
+
+.header-category-link {
+    color: white;
+    text-decoration: none;
+    font-weight: 700; /* Make it bold like other buttons */
+    background-color: dodgerblue; /* Blue background */
+    padding: 6px 15px !important; /* Reduced vertical padding and added important */
+    border-radius: 15px;
+    transition: background-color 0.3s ease;
+    display: inline-block; /* Keep as inline-block */
+    /* height: 40px; -- Let padding and font-size define height */
+    box-sizing: border-box;
+    border: 1px solid dodgerblue;
+    font-size: 1em;
+    /* line-height: 38px; -- Let padding and font-size define height */
+    text-align: center;
+    vertical-align: middle; /* Key for aligning inline-block elements */
+}
+
+.header-category-link:hover {
+    background-color: royalblue; /* Darker blue on hover */
+}
+
+#header-search-form {
+    display: inline-flex; /* Changed to inline-flex for better alignment with sibling links */
+    align-items: center;
+    vertical-align: middle; /* Align the form itself with other inline-block elements */
+}
+
+.header-search-control {
+    padding: 6px 12px !important; /* Reduced vertical padding and added important */
+    font-size: 1em;
+    box-sizing: border-box;
+    border: 1px solid;
+    vertical-align: middle;
+    margin: 0 !important; /* Ensure no external margins interfere */
+}
+
+#header-search-input {
+    border-radius: 15px 0 0 15px;
+    border-color: #555;
+    background-color: #444;
+    color: white;
+    min-width: 300px; /* Restored min-width */
+    outline: none;
+}
+
+#header-search-input::placeholder {
+    color: #bbb;
+}
+
+#header-search-button {
+    padding: 6px 15px !important; /* Ensured consistent padding with !important */
+    border-radius: 0 15px 15px 0;
+    border-color: aquamarine;
+    background-color: aquamarine;
+    color: black;
+    cursor: pointer;
+    font-weight: 700;
+    display: inline-flex; /* Используем inline-flex для внутреннего центрирования */
+    align-items: center;
+    justify-content: center;
+}
+
+
+#a2 {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    align-items: center; /* Changed from baseline to center */
+}
+
+#profile-link { /* New rule for the profile link container */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Adds space between avatar and profile text */
+    text-decoration: none; /* Ensure no underline if not already handled */
+    color: inherit; /* Ensure text color is consistent */
+}
+
+#error-text{
+    font-family: 'Lato', sans-serif;
+    margin-left: 26em;
+    margin-top: 5em;
+}
+
+#error-text-status{
+    font-family: 'Lato', sans-serif;
+    margin-left: 27.2em;
+}
+
+.reg-log-button { /* Changed from ID to class */
+    font-weight: 700;
+    background-color: aquamarine;
+    padding: 13px;
+    border-radius: 15px;
+    margin-right: 20px;
+    /* Ensure button-like appearance for divs if needed */
+    display: inline-block; /* Helps divs behave like buttons in terms of padding/margin */
+    text-align: center;
+    color: black; /* Explicitly set text color */
+    border: none; /* For button elements to match div appearance */
+    cursor: pointer; /* For divs to feel clickable */
+}
+
+#back-button {
+    font-weight: 700;
+    background-color: aquamarine;
+    padding: 13px;
+    border-radius: 15px;
+    margin-right: 20px;
+}
+
+#a1 {
+    text-transform: uppercase;
+    color: white;
+    justify-content: center;
+    margin-left: 35px;
+}
+
+#ref1 {
+    margin: 0;
+}
+
+#gov1 {
+    font-family: 'Lato', sans-serif;
+}
+
+* {
+    box-sizing: border-box
+}
+
+/* Add padding to containers */
+.container {
+    padding: 16px;
+    max-width: 1500px; /* Increased max-width for 4 cards */
+    display: flex;
+    margin: 0 auto; /* Center the container */
+    flex-direction: column;
+    align-content: center;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: stretch; /* Allow video-grid to stretch if needed */
+}
+
+/* Full-width input fields */
+input[type=text], input[type=password] {
+    width: 100%;
+    padding: 15px;
+    margin: 5px 0 22px 0;
+    display: inline-block;
+    border: none;
+    border-radius: 15px;
+    background: #f1f1f1;
+}
+
+    input[type=text]:focus, input[type=password]:focus {
+        background-color: #ddd;
+        outline: none;
+    }
+
+/* Overwrite default styles of hr */
+hr {
+    border: 1px solid #f1f1f1;
+    margin-bottom: 25px;
+}
+
+/* Set a style for the submit/register button */
+.registerbtn {
+    background-color: aquamarine;
+    color: black;
+    padding: 16px 20px;
+    margin: 8px 0;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    opacity: 0.9;
+    border-radius: 15px;
+}
+
+    .registerbtn:hover {
+        opacity: 1;
+    }
+
+/* Add a blue text color to links */
+a {
+    color: dodgerblue;
+}
+
+/* Set a grey background color and center the text of the "sign in" section */
+.signin {
+    background-color: #f1f1f1;
+    text-align: center;
+}
+
+a {
+    text-decoration: none;
+    color: black;
+}
+
+.blocktext {
+    display: flex;
+    flex-direction: column;
+    border: black;
+    align-content: center;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    margin-top: 15%;
+    font-family: 'Lato', sans-serif;
+}
+
+.ad_create {
+    font-family: 'Lato', sans-serif;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    margin-top: 5%;
+}
+
+label {
+    justify-content: center;
+}
+
+.form input[type="file"] {
+    z-index: 999;
+    line-height: 0;
+    font-size: 50px;
+    position: absolute;
+    opacity: 0;
+    filter: alpha(opacity = 0);
+    -ms-filter: "alpha(opacity=0)";
+    cursor: pointer;
+    _cursor: hand;
+    margin: 0;
+    padding: 0;
+    left: 0;
+}
+
+.add-photo-btn {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    text-align: center;
+    background-color: #83b81a;
+    color: #fff;
+    display: block;
+    width: 197px;
+    height: 31px;
+    font-size: 18px;
+    line-height: 30px;
+    float: left;
+}
+
+input[type="text"] {
+    float: left;
+}
+
+/* Video Grid and Card Styles */
+.video-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px; /* Adjust gap as needed */
+    justify-content: flex-start; /* Align cards to the start */
+    padding: 20px 0;
+}
+
+.video-card {
+    width: 350px; /* Adjusted card width for 4 cards per row */
+    border: 1px solid #cccccc;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: transform 0.2s ease-in-out, box-shadow 0.3s ease-in-out;
+    background-color: #fdfdfd; /* Slightly off-white background */
+    box-shadow: 0 3px 7px rgba(0,0,0,0.12); /* Slightly deeper default shadow */
+}
+
+.video-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.22); /* Deeper shadow on hover for more pop */
+}
+
+.video-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.video-thumbnail-container {
+    width: 100%;
+    height: 197px; /* Adjusted height for 16:9 aspect ratio (350 * 9 / 16) */
+    background-color: #ececec; /* Slightly different placeholder color */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; /* Ensure thumbnail doesn't break container bounds */
+}
+
+.video-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease-in-out; /* Smooth zoom for thumbnail */
+}
+
+.video-card:hover .video-thumbnail {
+    transform: scale(1.05); /* Zoom thumbnail slightly on card hover */
+}
+
+.video-info {
+    padding: 15px; /* Increased padding */
+}
+
+.video-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #1a2b3c; /* Even darker title for more contrast */
+    line-height: 1.3;
+}
+
+.video-uploader {
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 8px;
+}
+
+.video-meta {
+    font-size: 0.8rem;
+    color: #777;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.video-views,
+.video-date {
+    /* Individual styling if needed */
+}
+
+/* Player Page Specific Styles - YouTube Inspired Layout */
+.yt-watch-page-container {
+    display: flex;
+    flex-direction: row; /* Default for larger screens */
+    gap: 24px; /* Space between main content and sidebar */
+    max-width: calc(1280px + 400px + 24px); /* Approx player width + sidebar width + gap */
+    margin: 95px auto 20px auto; /* Adjusted top margin to account for fixed header */
+    padding: 0 16px; /* Padding on the sides of the whole page */
+}
+
+.yt-main-content { /* Left column */
+    flex: 1 1 1280px; /* Grow, shrink, basis for player area */
+    min-width: 0; /* Allow shrinking below basis */
+    /* background-color: #f0f0f0; /* Slightly off-white background for the main content area */
+    /* padding: 10px; */ /* Optional padding */
+    /* border-radius: 8px; */ /* Optional rounded corners for the whole column */
+}
+
+.yt-sidebar-content { /* Right column */
+    flex: 0 0 400px; /* Don't grow, don't shrink, fixed width for sidebar */
+    /* background-color: #f0f0f0; */ /* Optional: background for sidebar */
+    /* padding: 10px; */
+    /* border-radius: 8px; */
+}
+
+/* Responsive: Stack columns on smaller screens */
+@media (max-width: 1024px) { /* Adjust breakpoint as needed */
+    .yt-watch-page-container {
+        flex-direction: column;
+        max-width: 800px; /* Adjust for single column layout */
+    }
+    .yt-sidebar-content {
+        flex-basis: auto; /* Allow sidebar to take full width when stacked */
+        margin-top: 20px;
+    }
+}
+
+
+.video-player-main-column { /* Container for the video player itself */
+    width: 100%;
+    margin-bottom: 16px; /* Space below player */
+    background-color: #fff; /* White background for player area */
+    padding: 16px; /* Padding around player */
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); /* Subtle shadow for the player block */
+    border: 1px solid #e7e7e7; /* Light grey border */
+}
+
+#my-player { /* The Video.js player */
+    width: 100%;
+    aspect-ratio: 16 / 9; /* Enforce 16:9 aspect ratio */
+    border-radius: 6px; /* Slightly less rounded than container for inset look */
+    /* box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* Shadow is now on parent */
+    background-color: #000; /* Black background for player */
+}
+
+.video-details-column { /* For video title, description, channel info etc. below player */
+    background-color: #fff; /* White background for details area */
+    padding: 16px; /* Padding inside details block */
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); /* Subtle shadow for the details block */
+    margin-top: 16px; /* Space above video details */
+    border: 1px solid #e7e7e7; /* Light grey border */
+}
+
+.video-details-column h1 { /* Title of the video */
+    font-size: 2rem; /* Larger title */
+    font-weight: 700;
+    color: #2c3e50; /* Consistent with video card title */
+    margin-top: 0;
+    margin-bottom: 12px;
+    line-height: 1.3;
+}
+
+.video-meta-player {
+    font-size: 0.95rem; /* Slightly larger */
+    color: #555; /* Darker grey */
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e8e8e8; /* Softer separator */
+}
+
+.video-views-player,
+.video-date-player {
+    /* No specific changes needed now */
+}
+
+.channel-info {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e8e8e8; /* Softer separator */
+}
+
+.channel-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    object-fit: cover;
+    border: 2px solid #f0f0f0; /* Lighter border */
+}
+
+.channel-avatar-placeholder { /* Already styled, ensure consistency */
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 15px;
+    background-color: #e0e0e0;
+}
+
+.channel-name {
+    font-size: 1.2rem; /* Larger channel name */
+    font-weight: 600;
+    color: #333;
+}
+
+.video-description {
+    font-size: 1rem; /* Larger description text */
+    line-height: 1.7; /* Improved readability */
+    color: #444; /* Slightly darker */
+    margin-top: 15px;
+    white-space: pre-wrap; /* Preserve line breaks in description */
+}
+
+/* Remove the old .video-container styles for player page if they conflict */
+/* The new structure is .player-page-container > .video-player-main-column and .video-details-column */
+/* We need to ensure the old .video-container (lines 292-299 in previous version) is either removed or adapted if it was meant for something else */
+/* For now, I'll assume the new structure replaces it for the player page. */
+/* If .video-container was also used on other pages, this might need adjustment. */
+/* Based on its previous content, it was specific to player.ejs */
+
+/* Commenting out old .video-container to avoid conflict, can be deleted if new structure is fine */
+/*
+.video-container {
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+*/
+
+/* Ensure header styles from index.ejs are available if not globally defined */
+/* #box, #a1, #a2, #reg-log-button etc. might need to be here or in a shared layout CSS */
+
+/* User Profile Page Styles */
+/* body styles moved to the top */
+
+.profile-container {
+    max-width: 1000px; /* Adjusted max-width */
+    margin: 30px auto;
+    padding: 25px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    padding-bottom: 25px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.profile-avatar-container {
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.profile-avatar {
+    width: 120px; /* Larger avatar */
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #eee;
+}
+
+.profile-avatar-placeholder {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem; /* For potential initials or icon */
+    color: #777;
+}
+
+.profile-info .profile-username {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+}
+
+.profile-actions {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    gap: 15px;
+    margin-bottom: 30px;
+    align-items: flex-end; /* Align items to bottom if they wrap */
+}
+
+.avatar-upload-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.form-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.form-input-file {
+    /* Basic styling for file input, can be enhanced */
+    border: 1px solid #ccc;
+    padding: 8px;
+    border-radius: 5px;
+    font-size: 0.9rem;
+}
+
+/* General Button Styles (can be refactored for site-wide consistency) */
+.btn {
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none; /* For anchor tags styled as buttons */
+    display: inline-block; /* For anchor tags */
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: aquamarine; /* Using existing theme color */
+    color: #333;
+}
+.btn-primary:hover {
+    background-color: #76c7b7; /* Darker shade */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+.btn-secondary:hover {
+    background-color: #5a6268;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+.btn-danger:hover {
+    background-color: #c82333;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.profile-videos-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.no-videos-message {
+    color: #777;
+    font-style: italic;
+}
+
+.profile-video-grid .video-card {
+    /* Using existing .video-card styles, ensure they are compatible */
+    /* Specific overrides for profile page if needed */
+}
+
+.video-actions {
+    padding: 0 12px 12px 12px;
+    margin-top: -5px; /* Adjust to align with card content */
+}
+
+.video-actions .btn-danger {
+    width: 100%; /* Make delete button full width of its container */
+}
+
+.profile-danger-zone {
+    margin-top: 40px;
+    padding-top: 25px;
+    border-top: 1px dashed #ffbaba; /* More prominent separator */
+    background-color: #fff3f3; /* Light red background */
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.profile-danger-zone h3 {
+    color: #a83232;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+#back-button-link #back-button { /* Ensure back button styling is correct */
+    font-weight: 700;
+    background-color: aquamarine;
+    padding: 13px;
+    border-radius: 15px;
+    margin-right: 20px;
+    color: black; /* Ensure text color is visible */
+}
+
+/* Comments Section Styles - YouTube Inspired */
+.comments-section {
+    margin-top: 25px; /* Reduced top margin */
+    padding-top: 0; /* Remove padding, border will be on h3 or form */
+    /* border-top: 1px solid #e0e0e0; */ /* Removed top border from section */
+}
+
+.comments-section h3 { /* "Comments (N)" header */
+    font-size: 1.2rem; /* Slightly smaller, more like YouTube's sub-headers */
+    color: #0f0f0f; /* YouTube's dark text color */
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0; /* Border below the "Comments" title */
+}
+
+.comment-form { /* Container for the textarea and button */
+    display: flex;
+    align-items: flex-start; /* Align avatar and textarea top */
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.comment-form .comment-author-avatar { /* Avatar for current user next to textarea */
+    flex-shrink: 0; /* Prevent avatar from shrinking */
+}
+.comment-form .comment-author-avatar img,
+.comment-form .avatar-placeholder-small {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.comment-form .avatar-placeholder-small {
+     background-color: #d3d3d3; /* Slightly different placeholder */
+}
+
+
+.comment-form textarea {
+    flex-grow: 1; /* Textarea takes remaining space */
+    padding: 8px 12px;
+    border: none; /* Remove border */
+    border-bottom: 1px solid #ddd; /* Underline style */
+    border-radius: 0; /* No border radius for underline style */
+    min-height: 30px; /* Start smaller, can expand */
+    font-family: inherit;
+    font-size: 0.9rem; /* YouTube-like font size */
+    resize: none; /* Disable manual resize, rely on auto-height or JS */
+    background-color: transparent; /* Transparent background */
+    outline: none; /* Remove focus outline */
+    transition: border-bottom-color 0.2s ease;
+}
+.comment-form textarea:focus {
+    border-bottom-color: #065fd4; /* YouTube's blue focus color */
+}
+
+.comment-form .comment-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+    /* This div would wrap the button if we had cancel/submit */
+}
+
+.comment-form button {
+    background-color: #065fd4; /* YouTube blue */
+    color: white;
+    padding: 8px 15px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 18px; /* Pill shape */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    /* Remove float if actions div is used */
+}
+.comment-form button:hover {
+    background-color: #054ab0; /* Darker blue */
+}
+/* Remove clearfix if float is removed */
+/*
+.comment-form::after {
+    content: "";
+    clear: both;
+    display: table;
+}
+*/
+
+.comments-list {
+    margin-top: 20px;
+}
+
+.comment-item {
+    display: flex;
+    gap: 12px; /* Slightly reduced gap */
+    padding: 12px 0; /* Reduced padding */
+    border-bottom: none; /* Remove individual comment borders */
+}
+.comment-item:not(:last-child) {
+     margin-bottom: 10px; /* Space between comments instead of border */
+}
+
+
+.comment-author-avatar img { /* Already defined, ensure consistency */
+    width: 36px; /* Slightly smaller comment avatars */
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.avatar-placeholder-small { /* For comments if user has no avatar */
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #d3d3d3;
+    display: inline-block;
+}
+
+.comment-content {
+    flex-grow: 1;
+}
+
+.comment-author-name {
+    font-weight: 500; /* Medium weight */
+    color: #0f0f0f; /* YouTube dark text */
+    margin-right: 6px;
+    font-size: 0.85rem; /* Smaller author name */
+}
+
+.comment-date {
+    font-size: 0.75rem; /* Smaller date */
+    color: #606060; /* YouTube grey text */
+}
+
+.comment-text {
+    margin-top: 3px; /* Reduced space above text */
+    font-size: 0.9rem; /* Consistent with textarea */
+    line-height: 1.4; /* Slightly tighter line height */
+    color: #0f0f0f; /* YouTube dark text */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+#noCommentsMessage {
+    color: #606060; /* YouTube grey text */
+    font-style: normal; /* No italic */
+    padding: 10px 0;
+    font-size: 0.9rem;
+}
+
+/* Recommended Videos Section Styles */
+.recommended-videos-section {
+    margin-bottom: 25px;
+}
+
+.recommended-videos-section h4 {
+    font-size: 1.1rem;
+    color: #0f0f0f; /* YouTube dark text */
+    margin-top: 0; /* Reset margin if it's the first element in sidebar */
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    /* border-bottom: 1px solid #e0e0e0; */ /* Optional: separator for title */
+}
+
+.recommended-video-item {
+    display: flex;
+    gap: 12px; /* Slightly increased gap for better separation */
+    margin-bottom: 12px; /* Consistent spacing */
+    text-decoration: none;
+    color: inherit;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+    padding: 4px; /* Small padding for hover effect area */
+}
+.recommended-video-item:hover {
+    background-color: rgba(0,0,0,0.05); /* Very subtle hover */
+}
+
+.recommended-video-thumbnail {
+    flex-shrink: 0;
+    width: 160px; /* Slightly smaller than YT's 168px for compactness */
+    height: 90px;  /* 16:9 aspect ratio */
+    overflow: hidden;
+    border-radius: 4px; /* Consistent with item hover */
+    background-color: #e0e0e0; /* Placeholder background */
+}
+.recommended-video-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.video-thumbnail-placeholder-small { /* Ensure this is styled if used as fallback */
+    width: 100%; /* This was for comment avatars, ensure it's suitable here or make a new one */
+    height: 100%;
+    background-color: #e0e0e0; /* Fallback if img fails */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #888;
+    font-size: 0.8rem;
+}
+
+
+.recommended-video-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Align text to top */
+    flex-grow: 1; /* Allow info to take available space */
+    min-width: 0; /* Crucial for preventing overflow with long text */
+    padding-top: 0; /* Remove small padding, rely on line-height and margins */
+}
+
+.recommended-video-title {
+    font-size: 0.875rem; /* 14px */
+    font-weight: 500;
+    color: #0f0f0f;
+    margin: 0 0 3px 0;
+    line-height: 1.3;
+    max-height: 2.6em; /* Allow for two lines */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box; /* Required for multi-line ellipsis */
+    -webkit-line-clamp: 2; /* Number of lines to show */
+    -webkit-box-orient: vertical;
+}
+
+.recommended-video-uploader,
+.recommended-video-views {
+    font-size: 0.75rem; /* 12px */
+    color: #606060;
+    margin: 0 0 1px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Styles for new avatar update section */
+.avatar-update-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center items in this section */
+    gap: 12px; /* Gap between heading, preview, and form */
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    min-width: 250px; /* Ensure it has some width */
+    margin-bottom: 20px; /* Space below this section if others follow */
+}
+
+.avatar-update-section h4.form-label { /* More specific selector for the heading */
+    font-weight: 600;
+    font-size: 1.1rem; /* Larger heading */
+    color: #333;
+    margin-bottom: 5px; /* Space below heading */
+    text-align: center;
+}
+
+.avatar-preview-img {
+    width: 150px; /* Larger preview */
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #ddd;
+    margin-bottom: 10px; /* Space below preview */
+    background-color: #fff; /* Background if image is transparent or fails to load */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.avatar-upload-form { /* The form itself */
+    display: flex;
+    flex-direction: column; /* Stack label/button and actual button */
+    align-items: center; /* Center the items in the form */
+    gap: 10px;
+    width: 100%; /* Make form take width of its container */
+}
+
+.btn-file-upload { /* Styling for the label that acts as a button */
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    /* .btn and .btn-primary styles will be applied from general button styles */
+    /* Ensure it looks like a button */
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none;
+    text-align: center;
+    background-color: aquamarine; /* From .btn-primary */
+    color: #333; /* From .btn-primary */
+}
+.btn-file-upload:hover {
+    background-color: #76c7b7; /* From .btn-primary:hover */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* From .btn-primary:hover */
+}
+
+
+/* Ensure .btn-success is defined if not already, or use existing classes */
+.btn-success { /* For the actual upload button */
+    background-color: #28a745;
+    color: white;
+    /* Inherits .btn styles for padding, border-radius etc. */
+}
+.btn-success:hover {
+    background-color: #218838;
+}
+
+/* Removed styles for the rewind button as it's no longer used */

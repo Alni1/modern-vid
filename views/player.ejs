@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | ModernVid</title>
+  <link href="/stylesheets/style.css" rel="stylesheet">
+  <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet">
+  <%# <link href="https://unpkg.com/videojs-resolution-switcher/lib/videojs-resolution-switcher.css" rel="stylesheet"> %>
+  <style>
+    /* .vjs-resolution-button .vjs-menu-button-popup .vjs-menu { */
+    /*   width: 5em; */ /* Adjust as needed */
+    /* } */
+    .video-container { /* This style seems to be a leftover, not directly used by the player itself */
+      max-width: 800px;
+      margin: 20px auto;
+    }
+    .video-info {
+      margin-top: 20px;
+    }
+    .channel-info {
+      display: flex;
+      align-items: center;
+      margin-top: 15px;
+    }
+    .channel-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      margin-right: 15px;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+<div id="box">
+  <a href="/" style="text-decoration: none; color: inherit;"><h2 id="a1">modernvid</h2></a>
+  <div id="a2">
+    <% if (user) { %>
+      <a id="profile-link" href="/userprofile">
+        <% if (user.avatarUrl) { %>
+          <img src="<%= user.avatarUrl %>" alt="Avatar" style="width:40px; height:40px; border-radius:50%; object-fit:cover;" />
+        <% } %>
+        <div class="reg-log-button">Profile</div>
+      </a>
+      <form method="POST" action="/logout" style="display:inline;">
+        <button class="reg-log-button" type="submit">Sign out</button>
+      </form>
+    <% } else { %>
+      <a href="/login"><div class="reg-log-button">Login</div></a>
+      <a href="/registration"><div class="reg-log-button">Register</div></a>
+    <% } %>
+  </div>
+</div>
+
+  <div class="yt-watch-page-container"> <!-- New main container for 2-column layout -->
+    <div class="yt-main-content"> <!-- Left column for player and video details -->
+      <% if (typeof video !== 'undefined' && video && video._id && video.contentType) { %>
+        <div class="video-player-main-column">
+          <%# <div style="margin-bottom: 10px;"> Removed Back button here </div> %>
+          <video-js id="my-player" class="vjs-default-skin vjs-big-play-centered" controls preload="auto" width="640" height="264">
+            <source src="/player/stream/<%= video._id %>" type="<%= video.contentType %>">
+            <p class="vjs-no-js">
+              To view this video please enable JavaScript, and consider upgrading to a
+              web browser that
+              <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+            </p>
+          </video-js>
+          <%# Removed custom controls div and rewind button %>
+        </div>
+
+        <div class="video-details-column"> <!-- This will now be part of the left column -->
+          <h1><%= video.title || "Video Title Unavailable" %></h1>
+          <div class="video-meta-player">
+            <span class="video-views-player"><%= video.views %> views</span>
+            <span class="video-date-player"><%= new Date(video.uploadedAt).toLocaleDateString() %></span>
+          </div>
+          <div class="channel-info">
+            <% if (video.user && video.user.avatarUrl) { %>
+              <img class="channel-avatar" src="<%= video.user.avatarUrl %>" alt="Channel avatar">
+            <% } else { %>
+              <div class="channel-avatar-placeholder"></div>
+            <% } %>
+            <span class="channel-name"><%= video.user?.username || 'Unknown Uploader' %></span>
+          </div>
+          <p class="video-description"><%= video.description || "No description available." %></p>
+        </div>
+      <% } else { %>
+        <div style="text-align: center; padding: 40px;">
+           <%# Removed Back button from error case as well %>
+          <p style="color: red; font-size: 1.2em;">
+            Error: Video data is not available or incomplete. Unable to load player.
+          </p>
+          <% if (typeof video !== 'undefined' && video) { %>
+            <p>Debug: Video ID: <%= video._id %>, ContentType: <%= video.contentType %></p>
+          <% } else { %>
+            <p>Debug: Video object is undefined.</p>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="yt-sidebar-content"> <!-- Right column for recommendations and comments -->
+      <% if (typeof video !== 'undefined' && video && video._id) { %>
+        <!-- Recommended Videos Section -->
+        <% if (typeof recommendedVideos !== 'undefined' && recommendedVideos.length > 0) { %>
+          <div class="recommended-videos-section">
+            <h4>Up next</h4>
+            <% recommendedVideos.forEach(recVideo => { %>
+              <a href="/player/<%= recVideo._id %>" class="recommended-video-item">
+                <div class="recommended-video-thumbnail">
+                  <% if (recVideo.thumbnailUrl) { %>
+                    <img src="<%= recVideo.thumbnailUrl %>" alt="<%= recVideo.title %>">
+                  <% } else { %>
+                    <div class="video-thumbnail-placeholder-small"></div>
+                  <% } %>
+                </div>
+                <div class="recommended-video-info">
+                  <h5 class="recommended-video-title"><%= recVideo.title %></h5>
+                  <p class="recommended-video-uploader"><%= recVideo.user?.username || 'Unknown' %></p>
+                  <p class="recommended-video-views"><%= recVideo.views %> views</p>
+                </div>
+              </a>
+            <% }) %>
+          </div>
+        <% } %>
+        <!-- End Recommended Videos Section -->
+
+        <!-- Comments Section -->
+        <div class="comments-section">
+          <h3>Comments (<%= video.comments ? video.comments.length : 0 %>)</h3>
+          <% if (user) { %>
+            <div class="comment-form">
+              <div class="comment-author-avatar">
+                <% if (user.avatarUrl) { %>
+                  <img src="<%= user.avatarUrl %>" alt="<%= user.username %> avatar">
+                <% } else { %>
+                  <div class="avatar-placeholder-small"></div>
+                <% } %>
+              </div>
+              <form id="commentForm" style="flex-grow: 1;">
+                <textarea id="commentText" name="text" placeholder="Add a comment..." required></textarea>
+                <div class="comment-form-actions">
+                  <button type="submit">Post Comment</button>
+                </div>
+              </form>
+            </div>
+          <% } else { %>
+            <p style="margin-top: 15px; margin-bottom: 20px; font-size: 0.9rem;">
+              <a href="/login" style="color: #065fd4; text-decoration: none;">Log in</a> to post a comment.
+            </p>
+          <% } %>
+    
+          <div id="commentsList" class="comments-list">
+            <% if (video.comments && video.comments.length > 0) { %>
+              <% video.comments.forEach(comment => { %>
+                <div class="comment-item" data-comment-id="<%= comment._id %>">
+                  <div class="comment-author-avatar">
+                    <% if (comment.user && comment.user.avatarUrl) { %>
+                      <img src="<%= comment.user.avatarUrl %>" alt="<%= comment.user.username %> avatar">
+                    <% } else { %>
+                      <div class="avatar-placeholder-small"></div>
+                    <% } %>
+                  </div>
+                  <div class="comment-content">
+                    <span class="comment-author-name"><%= comment.user ? comment.user.username : 'User' %></span>
+                    <span class="comment-date"><%= new Date(comment.createdAt).toLocaleString() %></span>
+                    <p class="comment-text"><%= comment.text %></p>
+                  </div>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <p id="noCommentsMessage">No comments yet. Be the first to comment!</p>
+            <% } %>
+          </div>
+        </div>
+        <!-- End Comments Section -->
+      <% } %>
+    </div>
+  </div>
+
+  <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+  <%# <script src="https://unpkg.com/videojs-resolution-switcher/lib/videojs-resolution-switcher.js"></script> %>
+  <script>
+    // Only initialize player if the video element exists
+    if (document.getElementById('my-player')) {
+      const player = videojs('my-player', {
+        fluid: true,
+        responsive: true,
+        playbackRates: [0.5, 1, 1.5, 2]
+        // No custom plugins or complex source handling for the reverted version
+      });
+
+      player.ready(function() {
+        console.log('Video.js player is ready (reverted).');
+        
+        this.on('error', function() {
+          const error = player.error();
+          console.error('Video.js Error (reverted):', error);
+          // Optionally display a more user-friendly error message on the page
+          const errorDisplay = document.createElement('div');
+          errorDisplay.style.color = 'red';
+          errorDisplay.style.marginTop = '10px';
+          errorDisplay.style.textAlign = 'center';
+          errorDisplay.textContent = 'An error occurred while trying to play the video.';
+          if (error && error.message) {
+            errorDisplay.textContent += ' Details: ' + error.message;
+          }
+          const playerElement = document.getElementById('my-player');
+          if (playerElement && playerElement.parentElement) {
+             // Clear previous player children (like the <p> or previous errors) and add new error
+             while (playerElement.firstChild) {
+                playerElement.removeChild(playerElement.firstChild);
+             }
+            playerElement.appendChild(errorDisplay);
+          }
+        });
+      });
+    } else {
+      console.log('Video.js: Player element not found, skipping initialization (reverted).');
+    }
+
+    // Handle Comment Submission (this part remains unchanged)
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+      commentForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const commentTextElement = document.getElementById('commentText');
+        const text = commentTextElement.value.trim();
+        const videoId = '<%= video && video._id ? video._id : "" %>'; // Get videoId from EJS, ensure video object exists
+
+        if (!videoId) {
+          console.error('Video ID is not available for posting comment.');
+          alert('Cannot post comment: Video ID is missing.');
+          return;
+        }
+
+        if (!text) {
+          alert('Comment cannot be empty.');
+          return;
+        }
+
+        try {
+          const response = await fetch(`/comments/${videoId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // If your verifyToken middleware checks JWT from cookies, this might not be needed.
+              // If it expects a header, you'd retrieve the token (e.g., from a cookie or global var)
+              // and add: 'Authorization': `Bearer ${your_jwt_token}`
+            },
+            body: JSON.stringify({ text })
+          });
+
+          if (response.ok) {
+            const newComment = await response.json();
+            addCommentToDOM(newComment);
+            commentTextElement.value = ''; // Clear textarea
+            
+            // Update comment count
+            const commentsSectionH3 = document.querySelector('.comments-section h3');
+            if (commentsSectionH3) {
+                const currentCount = parseInt(commentsSectionH3.textContent.match(/\d+/)[0] || 0);
+                commentsSectionH3.textContent = `Comments (${currentCount + 1})`;
+            }
+
+          } else {
+            const errorData = await response.json();
+            console.error('Error posting comment:', errorData);
+            alert(`Error posting comment: ${errorData.message || response.statusText}`);
+          }
+        } catch (error) {
+          console.error('Failed to submit comment:', error);
+          alert('Failed to submit comment. Please try again.');
+        }
+      });
+    }
+
+    function addCommentToDOM(comment) {
+      const commentsList = document.getElementById('commentsList');
+      if (!commentsList) return;
+
+      // Remove "no comments" message if it exists
+      const noCommentsMessage = document.getElementById('noCommentsMessage');
+      if (noCommentsMessage) {
+        noCommentsMessage.remove();
+      }
+
+      const commentItem = document.createElement('div');
+      commentItem.classList.add('comment-item');
+      commentItem.dataset.commentId = comment._id;
+
+      const avatarDiv = document.createElement('div');
+      avatarDiv.classList.add('comment-author-avatar');
+      if (comment.user && comment.user.avatarUrl) {
+        const avatarImg = document.createElement('img');
+        avatarImg.src = comment.user.avatarUrl;
+        avatarImg.alt = `${comment.user.username || 'User'} avatar`;
+        avatarDiv.appendChild(avatarImg);
+      } else {
+        const placeholderDiv = document.createElement('div');
+        placeholderDiv.classList.add('avatar-placeholder-small');
+        avatarDiv.appendChild(placeholderDiv);
+      }
+
+      const contentDiv = document.createElement('div');
+      contentDiv.classList.add('comment-content');
+
+      const authorSpan = document.createElement('span');
+      authorSpan.classList.add('comment-author-name');
+      authorSpan.textContent = comment.user ? comment.user.username : 'User';
+
+      const dateSpan = document.createElement('span');
+      dateSpan.classList.add('comment-date');
+      dateSpan.textContent = new Date(comment.createdAt).toLocaleString();
+
+      const textP = document.createElement('p');
+      textP.classList.add('comment-text');
+      textP.textContent = comment.text; // Use textContent to prevent XSS
+
+      contentDiv.appendChild(authorSpan);
+      contentDiv.appendChild(dateSpan);
+      contentDiv.appendChild(textP);
+
+      commentItem.appendChild(avatarDiv);
+      commentItem.appendChild(contentDiv);
+
+      // Add to the top of the list (newest first)
+      commentsList.insertBefore(commentItem, commentsList.firstChild);
+    }
+
+    // Removed Rewind button functionality script
+  </script>
+</body>
+</html>
