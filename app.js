@@ -3,24 +3,11 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var mongoose = require('mongoose');
-// Firebase initialization is now in firebase-init.js
-// const { initializeApp } = require('firebase/app'); // Firebase app
-// const { getStorage } = require('firebase/storage'); // Firebase storage
 const { firebaseApp, firebaseStorage } = require('./firebase-init'); // Import from new module
 
 require('dotenv').config();
 
-// Firebase Configuration - MOVED to firebase-init.js
-// const firebaseConfig = { ... };
 
-// Initialize Firebase - MOVED to firebase-init.js
-// let firebaseApp;
-// let firebaseStorage;
-// try { ... } catch { ... }
-
-// Routes and other modules will be imported after 'app' is created and configured.
-// We will NOT attach firebaseApp and firebaseStorage to the 'app' instance later.
-// They will be imported directly where needed.
 const logoutRouter = require('./routes/logout');
 var RateLimit = require('express-rate-limit');
 var limiter = RateLimit({
@@ -60,10 +47,6 @@ mongoose.connect(process.env.MONGODB_URL, {
 .catch((err) => console.error('MongoDB connection error:', err));
 
 var app = express();
-
-// Attach Firebase instances to the app object - NO LONGER NEEDED
-// app.firebaseApp = firebaseApp;
-// app.firebaseStorage = firebaseStorage;
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

@@ -1,17 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const verifyToken = require('../middlewares/verifyToken'); // Middleware for authentication
+const verifyToken = require('../middlewares/verifyToken');
 const VideoMeta = require('../schemas/VideoMeta');
 const Comment = require('../schemas/CommentSchema');
 const User = require('../schemas/userSchema');
 
-// POST a new comment to a video
-// Path: /comments/:videoId
 router.post('/:videoId', verifyToken, async (req, res) => {
   const { videoId } = req.params;
   const { text } = req.body;
-  const userId = req.user._id; // Corrected to use _id from the Mongoose document
+  const userId = req.user._id;
 
   if (!text || text.trim() === '') {
     return res.status(400).json({ message: 'Comment text cannot be empty.' });
@@ -40,13 +38,12 @@ router.post('/:videoId', verifyToken, async (req, res) => {
 
     await newComment.save();
 
-    // Add comment to video's comments array using $addToSet to prevent duplicates
+
     await VideoMeta.findByIdAndUpdate(videoId, { $addToSet: { comments: newComment._id } });
 
-    // Add comment to user's comments array using $addToSet
+
     await User.findByIdAndUpdate(userId, { $addToSet: { comments: newComment._id } });
     
-    // Populate user details for the comment to send back to client
     const populatedComment = await Comment.findById(newComment._id).populate('user', 'username avatarUrl');
 
     res.status(201).json(populatedComment);

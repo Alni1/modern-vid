@@ -977,25 +977,22 @@ input[type="text"] {
     border-radius: 50%;
     object-fit: cover;
     border: 3px solid #ddd;
-    margin-bottom: 10px; /* Space below preview */
-    background-color: #fff; /* Background if image is transparent or fails to load */
+    margin-bottom: 10px;
+    background-color: #fff; 
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.avatar-upload-form { /* The form itself */
+.avatar-upload-form { 
     display: flex;
-    flex-direction: column; /* Stack label/button and actual button */
-    align-items: center; /* Center the items in the form */
+    flex-direction: column; 
     gap: 10px;
-    width: 100%; /* Make form take width of its container */
+    width: 100%; 
 }
 
-.btn-file-upload { /* Styling for the label that acts as a button */
+.btn-file-upload {
     position: relative;
     overflow: hidden;
     display: inline-block;
-    /* .btn and .btn-primary styles will be applied from general button styles */
-    /* Ensure it looks like a button */
     padding: 10px 18px;
     border-radius: 6px;
     border: none;
@@ -1005,23 +1002,22 @@ input[type="text"] {
     transition: background-color 0.2s ease, box-shadow 0.2s ease;
     text-decoration: none;
     text-align: center;
-    background-color: aquamarine; /* From .btn-primary */
-    color: #333; /* From .btn-primary */
+    background-color: aquamarine; 
+    color: #333;
 }
 .btn-file-upload:hover {
-    background-color: #76c7b7; /* From .btn-primary:hover */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* From .btn-primary:hover */
+    background-color: #76c7b7; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 
-/* Ensure .btn-success is defined if not already, or use existing classes */
-.btn-success { /* For the actual upload button */
+
+.btn-success { 
     background-color: #28a745;
     color: white;
-    /* Inherits .btn styles for padding, border-radius etc. */
 }
 .btn-success:hover {
     background-color: #218838;
 }
 
-/* Removed styles for the rewind button as it's no longer used */
+

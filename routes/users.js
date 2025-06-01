@@ -2,16 +2,10 @@ const express = require('express');
 const router = express.Router();
 const deleteUserCascade = require('../utils/deleteUser');
 
-/**
- * GET /users/
- */
 router.get('/', function (req, res) {
   res.send('respond with a resource');
 });
 
-/**
- * DELETE /users/delete/:id
- */
 router.delete('/delete/:id', async (req, res) => {
   const userId = req.params.id;
 

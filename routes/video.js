@@ -2,16 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { getStorage, ref, getDownloadURL, getMetadata } = require('firebase/storage');
 const mongoose = require('mongoose');
-const fetch = require('node-fetch'); // npm i node-fetch
+const fetch = require('node-fetch');
 const VideoCache = require('../models/VideoCache');
 const { firebaseStorage } = require('../app');
-const rateLimit = require('express-rate-limit'); // npm i express-rate-limit
+const rateLimit = require('express-rate-limit');
 
 const storage = firebaseStorage; 
 
 const VideoMeta = require('../schemas/VideoMeta'); 
 
-// Helper function to get video stream and cache metadata
 async function getVideoStream(videoId) {
   const cached = await VideoCache.findOne({ videoId });
   const videoRef = ref(storage, `videos/${videoId}`);
@@ -51,29 +50,22 @@ router.get('/', (req, res) => {
   });
 });
 
-// schema import to output video metadata
-
 const Video = require('../schemas/Video');
 
-// firebase instrumentation import to access video files
 const { ref, getDownloadURL } = require('firebase/storage');
 const { firebaseStorage } = require('../app');
 
-// route to show player with metadata
 const playerRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // max 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
 });
 
 router.get('/player/:id', playerRateLimiter, async (req, res) => {
   try {
-    // Find video metadata by ID
     const videoData = await Video.findOne({ videoId: req.params.id });
     if (!videoData) return res.status(404).send('Video not found');
-    // Get video URL from Firebase Storage
     const videoRef = ref(firebaseStorage, `videos/${videoData.videoId}`);
     const videoUrl = await getDownloadURL(videoRef);
-    // Render EJS template with video metadata
     res.render('player', {
       title: videoData.title,
       description: videoData.description,

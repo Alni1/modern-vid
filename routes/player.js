@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken'); // Added for token verification
-const User = require('../schemas/userSchema'); // Added for fetching user
+const jwt = require('jsonwebtoken'); 
+const User = require('../schemas/userSchema'); 
 const { ref, getDownloadURL } = require('firebase/storage');
 const VideoMeta = require('../schemas/VideoMeta');
-const { firebaseStorage } = require('../firebase-init'); // Import firebaseStorage directly
+const { firebaseStorage } = require('../firebase-init');
 const rateLimit = require('express-rate-limit');
 
 const playerRateLimiter = rateLimit({
@@ -12,8 +12,7 @@ const playerRateLimiter = rateLimit({
   max: 100,
 });
 
-// Получение метаданных видео и рендер страницы
-// Changed route from '/player/:id' to '/:id' as it's mounted on '/player' in app.js
+
 router.get('/:id', playerRateLimiter, async (req, res) => {
   try {
     let currentUser = null;
@@ -25,8 +24,7 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
         currentUser = await User.findById(decoded.id).lean();
       } catch (err) {
         console.warn('Player page: Invalid or expired token, proceeding as guest.', err.message);
-        // Not a critical error for viewing, user is simply not logged in.
-        // Clear cookie if token is invalid
+
         if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
             res.clearCookie('token');
         }
@@ -38,14 +36,14 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
       { $inc: { views: 1 } },
       { new: true }
     )
-    .populate('user', 'username avatarUrl') // Populate user who uploaded the video
-    .populate({ // Populate comments
+    .populate('user', 'username avatarUrl') 
+    .populate({ 
       path: 'comments',
-      populate: { // For each comment, populate the user who wrote it
+      populate: { 
         path: 'user',
-        select: 'username avatarUrl' // Select specific fields from user
+        select: 'username avatarUrl' 
       },
-      options: { sort: { createdAt: -1 } } // Sort comments by newest first
+      options: { sort: { createdAt: -1 } } 
     });
 
     if (!video) {
@@ -63,12 +61,12 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     const videoRef = ref(firebaseStorage, video.firebasePath);
     const videoUrl = await getDownloadURL(videoRef);
 
-    // Fetch other videos for recommendations (e.g., 5 latest, excluding current)
-    const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id } }) // Exclude current video
+    
+    const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id } }) 
       .sort({ uploadedAt: -1 })
-      .limit(5) // Limit to 5 recommendations
-      .select('title user thumbnailUrl views uploadedAt') // Explicitly select necessary fields
-      .populate('user', 'username avatarUrl') // Populate uploader's username and avatar
+      .limit(5) 
+      .select('title user thumbnailUrl views uploadedAt')
+      .populate('user', 'username avatarUrl') 
       .lean();
  
     res.render('player', {
@@ -76,8 +74,8 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
       description: video.description,
       videoUrl,
       video,
-      user: currentUser, // Pass the determined user (or null) to the template
-      recommendedVideos // Pass recommended videos to the template
+      user: currentUser, 
+      recommendedVideos 
     });
   } catch (err) {
     console.error('Error loading player page:', err);
@@ -85,7 +83,7 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
   }
 });
 
-// Стриминг видео с поддержкой Range-запросов
+
 router.get('/stream/:id', async (req, res) => {
   try {
     const video = await VideoMeta.findById(req.params.id);
@@ -99,11 +97,10 @@ router.get('/stream/:id', async (req, res) => {
         console.error(`[STREAM_ROUTE_ERROR] Video with ID ${video._id} has no firebasePath.`);
         return res.status(500).send('Video data is incomplete (missing Firebase path)');
     }
-    const videoRef = ref(firebaseStorage, video.firebasePath); // Use imported firebaseStorage
+    const videoRef = ref(firebaseStorage, video.firebasePath);
     const videoUrl = await getDownloadURL(videoRef);
 
-    // Перенаправляем запрос к Firebase Storage
-    // Firebase сам обработает Range-запросы
+    
     res.redirect(videoUrl);
   } catch (err) {
     console.error(err);
