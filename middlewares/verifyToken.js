@@ -17,7 +17,6 @@ async function verifyToken(req, res, next) {
 
   if (!token) {
     console.log('[VERIFY_TOKEN_DEBUG] No token found. Path:', req.originalUrl, '. Redirecting to /login.');
-    // No cookie to clear if no token was found in the first place
     return res.redirect('/login');
   }
 

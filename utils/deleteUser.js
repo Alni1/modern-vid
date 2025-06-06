@@ -1,6 +1,6 @@
-const User = require('../schemas/userSchema');  // User model
-const Video = require('../schemas/VideoMeta'); // Video model
-const Log = require('../schemas/LogSchema'); // Log model
+const User = require('../schemas/userSchema');  
+const Video = require('../schemas/VideoMeta'); 
+const Log = require('../schemas/LogSchema'); 
 
 
 async function deleteUserCascade(userId) {

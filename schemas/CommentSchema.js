@@ -7,8 +7,8 @@ const commentSchema = new Schema({
   text: { type: String, required: true, trim: true, maxlength: 1000 },
   createdAt: { type: Date, default: Date.now }
 }, {
-  timestamps: true, // Automatically adds createdAt and updatedAt
-  collection: 'comDB' // Specify collection name
+  timestamps: true,
+  collection: 'comDB' 
 });
 
 module.exports = mongoose.model('Comment', commentSchema);

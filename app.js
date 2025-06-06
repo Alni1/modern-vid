@@ -3,7 +3,7 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var mongoose = require('mongoose');
-const { firebaseApp, firebaseStorage } = require('./firebase-init'); // Import from new module
+const { firebaseApp, firebaseStorage } = require('./firebase-init');
 
 require('dotenv').config();
 
@@ -11,24 +11,17 @@ require('dotenv').config();
 const logoutRouter = require('./routes/logout');
 var RateLimit = require('express-rate-limit');
 var limiter = RateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // max 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
 });
 
 var indexRouter = require('./routes/index');
-// ====================== VIDEO PLAYER ROUTE =========================
-// Registering the video player route (uses Firebase + MongoDB):
-// Route: /player/:videoId
-// Logic file: routes/player.js
-// Streams video from Firebase Storage, metadata cached in MongoDB (VideoCache)
-// Used together with Video.js frontend (views/player.ejs)
-// ===================================================================
 const playerRouter = require('./routes/player');
 
-const uploadRouter = require('./routes/upload');// ← added
+const uploadRouter = require('./routes/upload');
 const searchRouter = require('./routes/search');
-const userProfileRouter = require('./routes/userprofile'); // user profile route
-const commentRouter = require('./routes/comment'); // Import comment router
+const userProfileRouter = require('./routes/userprofile');
+const commentRouter = require('./routes/comment'); 
 
 
 var usersRouter = require('./routes/users');
@@ -36,19 +29,14 @@ var registrationRouter = require('./routes/registration');
 var loginRouter = require('./routes/login');
 const { validateHeaderName } = require('http');
 
-
-//mongoDB connection setup
-
 mongoose.connect(process.env.MONGODB_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => console.log('MongoDB connected'))
 .catch((err) => console.error('MongoDB connection error:', err));
-
 var app = express();
 
-// view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
