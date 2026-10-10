@@ -22,14 +22,15 @@ function parseJson<T>(value: string | null): T | null {
  * <mv-player src="..." poster="..." author-theme='{"accent":"#09f"}'></mv-player>
  *
  * Attributes:
- *  - src           media URL (MP4/WebM now, HLS later)
+ *  - src           media URL: HLS master playlist (.m3u8) or a plain MP4/WebM file
+ *  - fallback-src  plain file used when the adaptive stream cannot be played
  *  - poster        poster image URL
  *  - author-theme  JSON with the channel author's theme (appearance only)
  *  - preset        JSON with the viewer's saved preset (from the server);
  *                  when absent the preset stored in the browser is used
  */
 export class MVPlayerElement extends HTMLElement {
-  static observedAttributes = ['src', 'poster', 'author-theme', 'preset'];
+  static observedAttributes = ['src', 'fallback-src', 'poster', 'author-theme', 'preset'];
 
   private shadow: ShadowRoot;
   private video!: HTMLVideoElement;
@@ -45,8 +46,11 @@ export class MVPlayerElement extends HTMLElement {
     spinner: HTMLDivElement;
     error: HTMLDivElement;
     progressSlot: HTMLDivElement;
+    stats: HTMLDivElement;
   };
   private keyMap = new Map<string, string>();
+  private statsTimer = 0;
+  private lastThroughputSave = 0;
   private idleTimer = 0;
   private built = false;
   private viewerPreset: ViewerPreset | null = null;
@@ -74,11 +78,13 @@ export class MVPlayerElement extends HTMLElement {
 
   disconnectedCallback(): void {
     window.clearTimeout(this.idleTimer);
+    window.clearInterval(this.statsTimer);
+    if (this._core) storage.saveThroughput(this._core.throughput);
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, value: string | null): void {
     if (!this.built || oldValue === value) return;
-    if (name === 'src' && value) void this._core?.load(value);
+    if (name === 'src' && value) void this.loadSource(value);
     if (name === 'poster') this.video.poster = value ?? '';
     if (name === 'author-theme' || name === 'preset') this.applyConfig();
   }
@@ -88,6 +94,22 @@ export class MVPlayerElement extends HTMLElement {
     this.viewerPreset = preset;
     if (persist) storage.savePreset(preset);
     this.applyConfig();
+  }
+
+  /** QoE metrics of the current session (startup time, stalls, switches, bitrate, QoE score). */
+  qoe() {
+    return this._core?.qoe.snapshot() ?? null;
+  }
+
+  /** Shows or hides the technical statistics panel ("Stats for nerds"). */
+  toggleStats(force?: boolean): void {
+    const show = force ?? this.els.stats.hidden;
+    this.els.stats.hidden = !show;
+    window.clearInterval(this.statsTimer);
+    if (show) {
+      this.renderStats();
+      this.statsTimer = window.setInterval(() => this.renderStats(), 500);
+    }
   }
 
   play(): Promise<void> | undefined {
@@ -119,6 +141,9 @@ export class MVPlayerElement extends HTMLElement {
     const error = document.createElement('div');
     error.className = 'mv-error';
     error.hidden = true;
+    const stats = document.createElement('div');
+    stats.className = 'mv-stats';
+    stats.hidden = true;
 
     const controls = document.createElement('div');
     controls.className = 'mv-controls';
@@ -126,7 +151,7 @@ export class MVPlayerElement extends HTMLElement {
       '<div class="mv-progress-slot"></div>' +
       '<div class="mv-bar"><div class="mv-group mv-left"></div><div class="mv-group mv-right"></div></div>';
 
-    this.shadow.append(style, this.video, overlay, error, controls);
+    this.shadow.append(style, this.video, overlay, error, stats, controls);
     this.els = {
       bar: controls.querySelector('.mv-bar') as HTMLDivElement,
       left: controls.querySelector('.mv-left') as HTMLDivElement,
@@ -135,10 +160,19 @@ export class MVPlayerElement extends HTMLElement {
       spinner: overlay.querySelector('.mv-spinner') as HTMLDivElement,
       error,
       progressSlot: controls.querySelector('.mv-progress-slot') as HTMLDivElement,
+      stats,
     };
 
     const core = new PlayerCore(this.video, this);
     this._core = core;
+    core.abrSettings = () => this._config.quality;
+    core.bus.on('segment', () => {
+      // Remember the network speed for a "warm start" of the next session (at most every 10 s).
+      if (performance.now() - this.lastThroughputSave > 10_000) {
+        this.lastThroughputSave = performance.now();
+        storage.saveThroughput(core.throughput);
+      }
+    });
     this.progress = new ProgressBar(core);
     this.els.progressSlot.append(this.progress.el);
 
@@ -168,10 +202,55 @@ export class MVPlayerElement extends HTMLElement {
     this.addEventListener('pointerleave', () => this.scheduleIdle(300));
 
     const src = this.getAttribute('src');
-    if (src) void core.load(src).then(() => {
+    if (src) void this.loadSource(src).then(() => {
       if (this._config.behavior.autoplay) void core.play();
     });
     this.render(core.state);
+  }
+
+  private async loadSource(url: string): Promise<void> {
+    if (!this._core) return;
+    try {
+      await this._core.load(url, {
+        fallbackUrl: this.getAttribute('fallback-src'),
+        initialThroughput: storage.loadThroughput(),
+      });
+    } catch (err) {
+      console.error('[MVPlayer] cannot load media', err);
+    }
+  }
+
+  private renderStats(): void {
+    const core = this._core;
+    if (!core) return;
+    const st = core.stats();
+    const q = core.qoe.snapshot();
+    const mbps = (bps: number): string => (bps ? `${(bps / 1e6).toFixed(2)} Mbit/s` : '—');
+    const rows: Array<[string, string]> = [
+      ['Engine', st?.engine ?? '—'],
+      ['ABR algorithm', st && st.level >= 0 ? `${st.algorithm}${st.auto ? '' : ' (manual)'}` : '—'],
+      ['Quality', st?.levelName ? `${st.levelName} (${st.resolution})` : st?.resolution ?? '—'],
+      ['Bitrate', mbps(st?.bitrate ?? 0)],
+      ['Throughput', mbps(st?.throughput ?? 0)],
+      ['Buffer', `${(st?.buffer ?? 0).toFixed(1)} s`],
+      ['Dropped frames', `${st?.droppedFrames ?? 0} / ${st?.totalFrames ?? 0}`],
+      ['Startup time', q.startupTime !== null ? `${q.startupTime.toFixed(2)} s` : '—'],
+      ['Stalls', `${q.rebufferCount} (${q.rebufferTime.toFixed(1)} s)`],
+      ['Quality switches', String(q.switches)],
+    ];
+    const table = document.createElement('table');
+    rows.forEach(([k, v]) => {
+      const tr = table.insertRow();
+      tr.insertCell().textContent = k;
+      tr.insertCell().textContent = v;
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'mv-stats-close';
+    close.setAttribute('aria-label', 'Close statistics');
+    close.textContent = '×';
+    close.addEventListener('click', () => this.toggleStats(false));
+    this.els.stats.replaceChildren(close, table);
   }
 
   /** Re-resolves the configuration and rebuilds theme, layout and hotkeys. */
@@ -279,7 +358,7 @@ export class MVPlayerElement extends HTMLElement {
     // Space/Enter on a focused button should press that button, not toggle playback.
     if ((e.key === ' ' || e.key === 'Enter') && target instanceof HTMLButtonElement) return;
     e.preventDefault();
-    runAction(action as Parameters<typeof runAction>[0], this._core, this._config);
+    runAction(action as Parameters<typeof runAction>[0], this._core, this._config, this);
     this.wake();
   };
 }

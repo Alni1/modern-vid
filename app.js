@@ -4,6 +4,7 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var mongoose = require('mongoose');
 const storage = require('./utils/storage');
+const { startWorker } = require('./utils/transcoder/worker');
 
 require('dotenv').config();
 
@@ -12,7 +13,7 @@ const logoutRouter = require('./routes/logout');
 var RateLimit = require('express-rate-limit');
 var limiter = RateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000, // per IP per 15 min; page views, status polling and API calls all count
 });
 
 var indexRouter = require('./routes/index');
@@ -30,7 +31,10 @@ var loginRouter = require('./routes/login');
 const { validateHeaderName } = require('http');
 
 mongoose.connect(process.env.MONGODB_URL)
-.then(() => console.log('MongoDB connected'))
+.then(() => {
+  console.log('MongoDB connected');
+  return startWorker();
+})
 .catch((err) => console.error('MongoDB connection error:', err));
 var app = express();
 

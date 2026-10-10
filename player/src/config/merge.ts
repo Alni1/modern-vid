@@ -14,7 +14,11 @@ export function deepMerge<T>(base: T, patch: unknown): T {
     const current = out[key];
     if (isPlainObject(current) && isPlainObject(value)) {
       out[key] = deepMerge(current, value);
-    } else if (Array.isArray(current) ? Array.isArray(value) : typeof value === typeof current) {
+    } else if (
+      Array.isArray(current) ? Array.isArray(value)
+        : current === null || value === null ? true // nullable fields such as quality.maxHeight
+          : typeof value === typeof current
+    ) {
       out[key] = Array.isArray(value) ? [...value] : value;
     }
   }

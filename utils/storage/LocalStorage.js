@@ -52,6 +52,28 @@ class LocalStorage {
     return key;
   }
 
+  /** Uploads every file of a local directory under the given key prefix. */
+  async putDir(prefix, dir, { move = false } = {}) {
+    const entries = await fsp.readdir(dir, { withFileTypes: true, recursive: true });
+    let count = 0;
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      const full = path.join(e.parentPath || e.path, e.name);
+      const rel = path.relative(dir, full).split(path.sep).join('/');
+      await this.putFile(`${prefix}/${rel}`, full, { move });
+      count++;
+    }
+    return count;
+  }
+
+  /**
+   * Returns a local file path for reading the object (e.g. as FFmpeg input).
+   * For the local driver this is the file itself; `release()` is a no-op.
+   */
+  async getLocalPath(key) {
+    return { path: this.resolve(key), release: async () => {} };
+  }
+
   async delete(key) {
     if (!key) return;
     await fsp.rm(this.resolve(key), { force: true });

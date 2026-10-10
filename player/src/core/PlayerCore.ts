@@ -1,5 +1,7 @@
 import { EventBus } from './EventBus';
-import { pickSourceHandler, type SourceHandler } from './sources';
+import { pickSourceHandler, type AbrSettings, type SourceHandler, type StreamEvents, type StreamStats } from './sources';
+import { QoeTracker } from './QoeTracker';
+import type { Level } from '../streaming/m3u8';
 
 export interface PlaybackState {
   paused: boolean;
@@ -20,6 +22,19 @@ export interface CoreEvents extends Record<string, unknown> {
   state: PlaybackState;
   ready: PlaybackState;
   error: string;
+  /** Quality levels became known (empty for progressive playback). */
+  levels: Level[];
+  levelSwitch: StreamEvents['levelSwitch'];
+  segment: StreamEvents['segment'];
+  /** Automatic/manual quality selection changed. */
+  qualityMode: StreamEvents['mode'];
+}
+
+export interface LoadOptions {
+  /** Plain file to use when the adaptive stream cannot be played. */
+  fallbackUrl?: string | null;
+  /** Initial throughput estimate (bits/s) from the previous session — "warm start". */
+  initialThroughput?: number;
 }
 
 const MEDIA_EVENTS = [
@@ -36,6 +51,9 @@ export class PlayerCore {
   readonly bus = new EventBus<CoreEvents>();
   readonly video: HTMLVideoElement;
   private source: SourceHandler | null = null;
+  readonly qoe: QoeTracker;
+  /** Provider of the current ABR settings (set by the element from its configuration). */
+  abrSettings: () => AbrSettings = () => ({ algorithm: 'adaptive', mode: 'balanced', maxHeight: null });
   private fullscreenTarget: HTMLElement;
   private waiting = false;
   private lastError: string | null = null;
@@ -56,6 +74,7 @@ export class PlayerCore {
   constructor(video: HTMLVideoElement, fullscreenTarget: HTMLElement) {
     this.video = video;
     this.fullscreenTarget = fullscreenTarget;
+    this.qoe = new QoeTracker(video);
     MEDIA_EVENTS.forEach((ev) => video.addEventListener(ev, this.onMediaEvent));
     video.addEventListener('error', this.onError);
     document.addEventListener('fullscreenchange', this.onFullscreenChange);
@@ -83,11 +102,68 @@ export class PlayerCore {
     };
   }
 
-  async load(url: string): Promise<void> {
+  async load(url: string, options: LoadOptions = {}): Promise<void> {
     this.source?.destroy();
     this.lastError = null;
-    this.source = pickSourceHandler(url);
-    await this.source.attach(this.video, url);
+    const source = pickSourceHandler(url, options.initialThroughput);
+    this.source = source;
+    const ctx = {
+      emit: <K extends keyof StreamEvents>(event: K, payload: StreamEvents[K]): void => {
+        if (this.source !== source) return; // events of a replaced source
+        if (event === 'levels') this.qoe.setLevels(payload as Level[]);
+        if (event === 'levelSwitch') {
+          const p = payload as StreamEvents['levelSwitch'];
+          this.qoe.onLevelSwitch(p.to, p.from);
+        }
+        if (event === 'segment') this.qoe.onSegment((payload as StreamEvents['segment']).level);
+        if (event === 'error') {
+          this.lastError = payload as string;
+          this.bus.emit('error', this.lastError);
+          this.bus.emit('state', this.state);
+          return;
+        }
+        this.bus.emit(event === 'mode' ? 'qualityMode' : event, payload as never);
+      },
+      abr: () => this.abrSettings(),
+    };
+    try {
+      await source.attach(this.video, url, ctx);
+    } catch (err) {
+      if (this.source !== source) return;
+      console.warn('[MVPlayer] adaptive stream failed, falling back', err);
+      source.destroy();
+      if (!options.fallbackUrl) throw err;
+      this.source = pickSourceHandler(options.fallbackUrl);
+      await this.source.attach(this.video, options.fallbackUrl, ctx);
+      this.bus.emit('levels', []);
+    }
+  }
+
+  /** Quality levels of the adaptive stream (empty for progressive playback). */
+  get levels(): Level[] {
+    return this.source?.levels ?? [];
+  }
+
+  get currentLevel(): number {
+    return this.source?.currentLevel ?? -1;
+  }
+
+  get autoQuality(): boolean {
+    return this.source?.isAuto ?? true;
+  }
+
+  /** Selects a fixed quality level, or −1 for automatic selection. */
+  setLevel(index: number): void {
+    this.source?.setLevel?.(index);
+  }
+
+  stats(): StreamStats | null {
+    return this.source?.stats?.() ?? null;
+  }
+
+  /** Current throughput estimate, used to warm-start the next session. */
+  get throughput(): number {
+    return this.source?.stats?.().throughput ?? 0;
   }
 
   play(): Promise<void> {
@@ -152,6 +228,7 @@ export class PlayerCore {
     this.video.removeEventListener('error', this.onError);
     document.removeEventListener('fullscreenchange', this.onFullscreenChange);
     this.source?.destroy();
+    this.qoe.destroy();
     this.bus.clear();
   }
 }

@@ -12,6 +12,8 @@
       aspect-ratio: 16 / 9; display: grid; place-items: center; padding: 1em; margin-bottom: 12px;
       background: #111; color: #ddd; border-radius: 6px; text-align: center;
     }
+    .processing-bar { width: min(320px, 70vw); height: 6px; margin: 12px auto; border-radius: 3px; background: #333; overflow: hidden; }
+    .processing-bar > div { height: 100%; background: #ff3d3d; transition: width .5s ease; }
     .video-container { /* This style seems to be a leftover, not directly used by the player itself */
       max-width: 800px;
       margin: 20px auto;
@@ -59,9 +61,18 @@
       <% if (typeof video !== 'undefined' && video && video._id && video.contentType) { %>
         <div class="video-player-main-column">
           <%# <div style="margin-bottom: 10px;"> Removed Back button here </div> %>
-          <% if (playable) { %>
+          <% if (playable && processing) { %>
+            <div class="video-unavailable" id="processingBox" data-video-id="<%= video._id %>">
+              <div>
+                <p>The video is being processed into several qualities…</p>
+                <div class="processing-bar"><div id="processingFill" style="width: <%= Math.round((video.processingProgress || 0) * 100) %>%"></div></div>
+                <p id="processingText"><%= Math.round((video.processingProgress || 0) * 100) %>%</p>
+              </div>
+            </div>
+          <% } else if (playable) { %>
             <mv-player id="my-player"
-                       src="/player/stream/<%= video._id %>"
+                       src="<%= hlsUrl || progressiveUrl %>"
+                       <% if (hlsUrl) { %>fallback-src="<%= progressiveUrl %>"<% } %>
                        <% if (video.thumbnailUrl) { %>poster="<%= video.thumbnailUrl %>"<% } %>></mv-player>
           <% } else { %>
             <div class="video-unavailable">
@@ -181,6 +192,24 @@
   </div>
 
   <script>
+    // While the video is being transcoded, poll its status and reload when it is ready.
+    const processingBox = document.getElementById('processingBox');
+    if (processingBox) {
+      const id = processingBox.dataset.videoId;
+      const poll = async () => {
+        try {
+          const res = await fetch(`/player/status/${id}`);
+          const data = await res.json();
+          const pct = Math.round((data.progress || 0) * 100);
+          document.getElementById('processingFill').style.width = pct + '%';
+          document.getElementById('processingText').textContent = pct + '%';
+          if (data.status !== 'processing') return location.reload();
+        } catch (e) { /* try again later */ }
+        setTimeout(poll, 3000);
+      };
+      setTimeout(poll, 3000);
+    }
+
     // Handle Comment Submission (this part remains unchanged)
     const commentForm = document.getElementById('commentForm');
     if (commentForm) {

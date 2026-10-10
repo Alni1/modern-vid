@@ -126,10 +126,23 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 }
 .mv-menu-item {
   display: block; width: 100%; padding: .45em .8em; border: 0; border-radius: calc(var(--mv-radius) * .7);
-  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; white-space: nowrap;
 }
 .mv-menu-item:hover, .mv-menu-item:focus-visible { background: rgba(255,255,255,.14); outline: none; }
 .mv-menu-item[aria-checked="true"] { color: var(--mv-accent); font-weight: 600; }
+
+.mv-stats {
+  position: absolute; top: 10px; left: 10px; padding: 8px 28px 8px 10px; max-width: calc(100% - 20px);
+  background: rgba(0,0,0,.78); border-radius: var(--mv-radius); font: 12px/1.45 ui-monospace, Consolas, monospace;
+  pointer-events: auto; z-index: 2;
+}
+.mv-stats table { border-collapse: collapse; }
+.mv-stats td { padding: 0 6px 0 0; white-space: nowrap; }
+.mv-stats td:first-child { color: rgba(255,255,255,.65); }
+.mv-stats-close {
+  position: absolute; top: 2px; right: 4px; border: 0; background: none; color: inherit;
+  font-size: 16px; cursor: pointer; line-height: 1;
+}
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: 1.5s !important; } }
 `;

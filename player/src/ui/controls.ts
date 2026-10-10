@@ -115,30 +115,29 @@ const spacer: ControlFactory = () => {
   return { el, update: () => undefined };
 };
 
-const speed: ControlFactory = ({ core, config }) => {
+interface MenuItem {
+  label: string;
+  checked: boolean;
+  onSelect(): void;
+}
+
+/** Button with a pop-up menu (used by the speed and quality controls). */
+function createMenu(cls: string, label: string): {
+  el: HTMLDivElement;
+  btn: HTMLButtonElement;
+  setItems(items: MenuItem[]): void;
+  destroy(): void;
+} {
   const el = document.createElement('div');
   el.className = 'mv-menu-wrap';
-  const btn = button('mv-speed mv-text-btn', 'Playback speed', '1×');
+  const btn = button(`${cls} mv-text-btn`, label, '');
   btn.setAttribute('aria-haspopup', 'menu');
   btn.setAttribute('aria-expanded', 'false');
   const menu = document.createElement('div');
   menu.className = 'mv-menu';
   menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', label);
   menu.hidden = true;
-  const items = config.behavior.speeds.map((rate) => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'mv-menu-item';
-    item.setAttribute('role', 'menuitemradio');
-    item.textContent = rate === 1 ? 'Normal' : formatRate(rate);
-    item.addEventListener('click', () => {
-      core.setRate(rate);
-      close();
-      btn.focus();
-    });
-    menu.append(item);
-    return { rate, item };
-  });
   const close = (): void => {
     menu.hidden = true;
     btn.setAttribute('aria-expanded', 'false');
@@ -152,23 +151,91 @@ const speed: ControlFactory = ({ core, config }) => {
     if (!menu.hidden) (menu.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus();
   });
   menu.addEventListener('keydown', (e) => {
+    const items = [...menu.querySelectorAll<HTMLElement>('.mv-menu-item')];
+    const i = items.indexOf(e.composedPath()[0] as HTMLElement);
     if (e.key === 'Escape') {
       e.stopPropagation();
       close();
       btn.focus();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
     }
   });
   document.addEventListener('click', onDocClick, true);
   el.append(btn, menu);
+  let signature = '';
   return {
     el,
-    update: (s) => {
-      const t = formatRate(s.rate);
-      if (btn.textContent !== t) btn.textContent = t;
-      items.forEach(({ rate, item }) => item.setAttribute('aria-checked', String(Math.abs(rate - s.rate) < 1e-3)));
+    btn,
+    setItems(items) {
+      const sig = items.map((it) => `${it.label}:${it.checked}`).join('|');
+      if (sig === signature) return;
+      signature = sig;
+      menu.replaceChildren(
+        ...items.map((it) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'mv-menu-item';
+          item.setAttribute('role', 'menuitemradio');
+          item.setAttribute('aria-checked', String(it.checked));
+          item.textContent = it.label;
+          item.addEventListener('click', () => {
+            it.onSelect();
+            close();
+            btn.focus();
+          });
+          return item;
+        }),
+      );
     },
     destroy: () => document.removeEventListener('click', onDocClick, true),
   };
+}
+
+const speed: ControlFactory = ({ core, config }) => {
+  const m = createMenu('mv-speed', 'Playback speed');
+  return {
+    el: m.el,
+    update: (s) => {
+      const t = formatRate(s.rate);
+      if (m.btn.textContent !== t) m.btn.textContent = t;
+      m.setItems(
+        [...config.behavior.speeds].reverse().map((rate) => ({
+          label: rate === 1 ? 'Normal' : formatRate(rate),
+          checked: Math.abs(rate - s.rate) < 1e-3,
+          onSelect: () => core.setRate(rate),
+        })),
+      );
+    },
+    destroy: m.destroy,
+  };
+};
+
+/** Quality menu: "Auto" (ABR) or a fixed level. Hidden when there is only one quality. */
+const quality: ControlFactory = ({ core }) => {
+  const m = createMenu('mv-quality', 'Quality');
+  const render = (): void => {
+    const levels = core.levels;
+    m.el.hidden = levels.length < 2;
+    if (levels.length < 2) return;
+    const current = levels[core.currentLevel];
+    const auto = core.autoQuality;
+    const text = auto ? `Auto${current ? ` · ${current.name}` : ''}` : current?.name ?? '';
+    if (m.btn.textContent !== text) m.btn.textContent = text;
+    m.setItems([
+      ...[...levels].reverse().map((l) => ({
+        label: l.name,
+        checked: !auto && core.currentLevel === l.index,
+        onSelect: () => core.setLevel(l.index),
+      })),
+      { label: `Auto${auto && current ? ` (${current.name})` : ''}`, checked: auto, onSelect: () => core.setLevel(-1) },
+    ]);
+  };
+  const offs = [core.bus.on('levels', render), core.bus.on('levelSwitch', render), core.bus.on('qualityMode', render)];
+  render();
+  return { el: m.el, update: () => undefined, destroy: () => { offs.forEach((off) => off()); m.destroy(); } };
 };
 
 const pip: ControlFactory = ({ core }) => {
@@ -200,6 +267,7 @@ export const controlRegistry = new Map<ControlId | string, ControlFactory>([
   ['time', time],
   ['spacer', spacer],
   ['speed', speed],
+  ['quality', quality],
   ['pip', pip],
   ['fullscreen', fullscreen],
 ]);

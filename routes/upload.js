@@ -9,6 +9,7 @@ const User = require('../schemas/userSchema');
 const verifyToken = require('../middlewares/verifyToken');
 const storage = require('../utils/storage');
 const { probe, makeThumbnail } = require('../utils/ffmpeg');
+const { enqueue } = require('../utils/transcoder/worker');
 
 const router = express.Router();
 
@@ -77,11 +78,14 @@ router.post('/', verifyToken, (req, res, next) => {
       storageKey: videoKey,
       thumbnailKey: thumbKey,
       thumbnailUrl: storage.getUrl(thumbKey),
+      status: 'processing',
+      processingProgress: 0,
       user: req.user._id,
       category,
     });
     await newVideo.save();
     await User.findByIdAndUpdate(req.user._id, { $push: { videos: newVideo._id } });
+    await enqueue(newVideo._id); // HLS transcoding runs in the background
 
     res.status(201).json({ message: 'Video uploaded successfully', videoId: newVideo._id, thumbnailUrl: newVideo.thumbnailUrl });
   } catch (error) {

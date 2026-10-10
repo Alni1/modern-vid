@@ -7,6 +7,7 @@ export type ControlId =
   | 'time'
   | 'spacer'
   | 'speed'
+  | 'quality'
   | 'pip'
   | 'fullscreen';
 
@@ -47,6 +48,19 @@ export interface BehaviorConfig {
   speeds: number[];
 }
 
+export type AbrAlgorithmName = 'adaptive' | 'hybrid' | 'throughput' | 'buffer';
+export type QualityMode = 'balanced' | 'eco' | 'stable' | 'quality';
+
+/** Adaptive streaming preferences of the viewer. */
+export interface QualityConfig {
+  /** ABR algorithm; 'adaptive' is the improved hybrid algorithm of this work. */
+  algorithm: AbrAlgorithmName;
+  /** Viewer-facing mode: economy, stability, balanced, maximum quality. */
+  mode: QualityMode;
+  /** Upper limit of the resolution (shorter side, e.g. 720), null = no limit. */
+  maxHeight: number | null;
+}
+
 /** Player actions that can be bound to keys. */
 export type HotkeyAction =
   | 'togglePlay'
@@ -57,7 +71,8 @@ export type HotkeyAction =
   | 'toggleMute'
   | 'toggleFullscreen'
   | 'speedUp'
-  | 'speedDown';
+  | 'speedDown'
+  | 'toggleStats';
 
 /** action -> list of KeyboardEvent.key values (case-insensitive). */
 export type HotkeysConfig = Record<HotkeyAction, string[]>;
@@ -66,6 +81,7 @@ export interface PlayerConfig {
   theme: ThemeConfig;
   layout: LayoutConfig;
   behavior: BehaviorConfig;
+  quality: QualityConfig;
   hotkeys: HotkeysConfig;
 }
 

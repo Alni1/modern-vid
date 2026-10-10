@@ -8,7 +8,10 @@
     "build": "npm run build:player",
     "build:player": "node player/build.mjs",
     "watch:player": "node player/build.mjs --watch",
-    "typecheck:player": "tsc -p player/tsconfig.json"
+    "typecheck:player": "tsc -p player/tsconfig.json",
+    "retranscode": "node scripts/retranscode.js",
+    "cleanup-legacy": "node scripts/cleanup-legacy.js",
+    "fix-init": "node scripts/fix-init.js"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

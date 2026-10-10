@@ -21,7 +21,7 @@ router.get('/', async function(req, res, next) {
 
   try {
 
-    videos = await VideoMeta.find()
+    videos = await VideoMeta.find({ status: { $ne: 'processing' } })
       .sort({ uploadedAt: -1 })
 
       .populate('user', 'username avatarUrl')

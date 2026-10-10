@@ -55,6 +55,10 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     }
     // Videos from the first version were stored in Firebase Storage, which is no longer available.
     const playable = Boolean(video.storageKey);
+    const processing = video.status === 'processing';
+    // Adaptive HLS stream when transcoding is finished; the original file is the fallback.
+    const hlsUrl = video.status === 'ready' && video.hls && video.hls.masterKey ? storage.getUrl(video.hls.masterKey) : null;
+    const progressiveUrl = `/player/stream/${video._id}`;
 
     const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id } }) 
       .sort({ uploadedAt: -1 })
@@ -67,6 +71,9 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
       title: video.title,
       description: video.description,
       playable,
+      processing,
+      hlsUrl,
+      progressiveUrl,
       video,
       user: currentUser, 
       recommendedVideos 
@@ -78,7 +85,15 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
 });
 
 
-// Redirects the player to the media file in the storage.
+// Processing state, polled by the watch page while the video is being transcoded.
+router.get('/status/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Video not found' });
+  const video = await VideoMeta.findById(req.params.id).select('status processingProgress').lean();
+  if (!video) return res.status(404).json({ error: 'Video not found' });
+  res.json({ status: video.status || 'ready', progress: video.processingProgress || 0 });
+});
+
+// Redirects the player to the original media file in the storage.
 router.get('/stream/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).send('Video not found');

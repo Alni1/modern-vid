@@ -13,6 +13,14 @@ const videoMetaSchema = new mongoose.Schema({
   storageDriver: String,
   storageKey: String,
   thumbnailKey: String,
+  // Processing state of an upload: transcoding into HLS renditions runs in the background.
+  status: { type: String, enum: ['processing', 'ready', 'failed'], default: 'ready' },
+  processingProgress: { type: Number, default: 0 },
+  processingError: String,
+  hls: {
+    masterKey: String,
+    renditions: [{ _id: false, name: String, width: Number, height: Number, videoKbps: Number, audioKbps: Number }],
+  },
   // Legacy: videos uploaded to Firebase Storage by the first version of the platform.
   firebasePath: String,
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

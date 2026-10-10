@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG: PlayerConfig = {
   },
   layout: {
     left: ['play', 'rewind', 'forward', 'volume', 'time'],
-    right: ['speed', 'pip', 'fullscreen'],
+    right: ['speed', 'quality', 'pip', 'fullscreen'],
     autoHide: true,
     autoHideDelay: 2500,
     centerPlay: true,
@@ -25,6 +25,11 @@ export const DEFAULT_CONFIG: PlayerConfig = {
     seekStep: 10,
     speeds: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3],
   },
+  quality: {
+    algorithm: 'adaptive',
+    mode: 'balanced',
+    maxHeight: null,
+  },
   hotkeys: {
     togglePlay: [' ', 'k'],
     seekBack: ['ArrowLeft', 'j'],
@@ -35,5 +40,6 @@ export const DEFAULT_CONFIG: PlayerConfig = {
     toggleFullscreen: ['f'],
     speedUp: ['>'],
     speedDown: ['<'],
+    toggleStats: ['i'],
   },
 };

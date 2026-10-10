@@ -23,12 +23,13 @@ npm run typecheck:player
 
 | Атрибут | Призначення |
 |---|---|
-| `src` | адреса відео (MP4/WebM; HLS — наступний етап) |
+| `src` | адреса відео: HLS master-плейлист (`.m3u8`) або звичайний файл MP4/WebM |
+| `fallback-src` | звичайний файл, якщо адаптивний потік відтворити неможливо |
 | `poster` | обкладинка |
 | `author-theme` | JSON з темою автора каналу (лише оформлення) |
 | `preset` | JSON з пресетом глядача з сервера; якщо немає — береться збережений у браузері |
 
-JS API: `el.core` (ядро: `play`, `pause`, `seek`, `setRate`, `bus.on('state', …)`), `el.config` (поточна конфігурація), `el.setViewerPreset(preset)`.
+JS API: `el.core` (ядро: `play`, `pause`, `seek`, `setRate`, `levels`, `setLevel(i | -1)`, `stats()`, `bus.on('state' | 'levelSwitch' | 'segment', …)`), `el.config`, `el.setViewerPreset(preset)`, `el.qoe()` (метрики QoE сеансу), `el.toggleStats()` (панель статистики, клавіша `i`).
 
 ## Структура
 
@@ -36,7 +37,12 @@ JS API: `el.core` (ядро: `play`, `pause`, `seek`, `setRate`, `bus.on('state'
 src/
   core/PlayerCore.ts     ядро: стан відтворення, керування <video>, події
   core/EventBus.ts       шина подій між модулями
-  core/sources.ts        обробники джерел (прогресивне; HLS/MSE — далі)
+  core/sources.ts        обробники джерел: прогресивне відтворення або HLS-рушій
+  core/QoeTracker.ts     метрики QoE: час старту, зупинки, перемикання, середній бітрейт, QoE (1.2)
+  streaming/m3u8.ts      розбір master- і media-плейлистів HLS
+  streaming/HlsEngine.ts HLS-рушій на MSE / ManagedMediaSource: буфер, сегменти, перемикання якості
+  abr/ThroughputEstimator.ts  оцінка пропускної здатності (швидке і повільне EWMA)
+  abr/algorithms.ts      ABR-алгоритми: throughput, buffer (BBA), hybrid, adaptive (запропонований)
   config/types.ts        схема конфігурації (тема, розкладка, поведінка, клавіші)
   config/defaults.ts     системні налаштування за замовчуванням
   config/merge.ts        ієрархія пресетів: система → автор → глядач
@@ -59,4 +65,14 @@ src/
 }
 ```
 
-Доступні елементи: `play`, `rewind`, `forward`, `volume`, `time`, `spacer`, `speed`, `pip`, `fullscreen`.
+Доступні елементи: `play`, `rewind`, `forward`, `volume`, `time`, `spacer`, `speed`, `quality`, `pip`, `fullscreen`.
+
+## Якість відтворення (група `quality` пресету)
+
+```json
+{ "quality": { "algorithm": "adaptive", "mode": "balanced", "maxHeight": 720 } }
+```
+
+- `algorithm`: `adaptive` (вдосконалений гібридний, за замовчуванням), `hybrid`, `throughput`, `buffer`;
+- `mode`: `balanced`, `quality` (максимальна якість), `stable` (менше перемикань), `eco` (економія трафіку, до 480p);
+- `maxHeight`: обмеження роздільної здатності (за коротшою стороною) або `null`.

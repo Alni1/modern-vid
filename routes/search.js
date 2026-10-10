@@ -9,7 +9,7 @@ router.get('/', optionalVerifyToken, async (req, res) => {
   const query = req.query.q;
   const category = req.query.category;
 
-  let searchConditions = {};
+  let searchConditions = { status: { $ne: 'processing' } };
 
   if (query) {
     searchConditions.$or = [

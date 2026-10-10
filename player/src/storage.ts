@@ -2,6 +2,7 @@ import type { ViewerPreset } from './config/types';
 
 const PREFS_KEY = 'mvplayer:prefs';
 const PRESET_KEY = 'mvplayer:preset';
+const THROUGHPUT_KEY = 'mvplayer:throughput';
 
 export interface RememberedPrefs {
   volume?: number;
@@ -34,4 +35,9 @@ export const storage = {
   },
   loadPreset: (): ViewerPreset | null => read<ViewerPreset>(PRESET_KEY),
   savePreset: (preset: ViewerPreset): void => write(PRESET_KEY, preset),
+  /** Last throughput estimate (bits/s): lets the next session start at a suitable quality. */
+  loadThroughput: (): number => Number(read<number>(THROUGHPUT_KEY)) || 0,
+  saveThroughput: (bps: number): void => {
+    if (bps > 0) write(THROUGHPUT_KEY, Math.round(bps));
+  },
 };
