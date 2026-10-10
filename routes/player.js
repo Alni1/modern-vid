@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken'); 
 const User = require('../schemas/userSchema'); 
-const { ref, getDownloadURL } = require('firebase/storage');
+const mongoose = require('mongoose');
 const VideoMeta = require('../schemas/VideoMeta');
-const { firebaseStorage } = require('../firebase-init');
+const storage = require('../utils/storage');
 const rateLimit = require('express-rate-limit');
 
 const playerRateLimiter = rateLimit({
@@ -14,8 +14,8 @@ const playerRateLimiter = rateLimit({
 
 
 router.get('/:id', playerRateLimiter, async (req, res) => {
+  let currentUser = null;
   try {
-    let currentUser = null;
     const token = req.cookies.token;
 
     if (token && process.env.SECRET_KEY) {
@@ -29,6 +29,10 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
             res.clearCookie('token');
         }
       }
+    }
+
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).render('error', { message: 'Video not found', error: { status: 404 }, user: currentUser });
     }
 
     const video = await VideoMeta.findByIdAndUpdate(
@@ -49,19 +53,9 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     if (!video) {
       return res.status(404).render('error', { message: 'Video not found', error: { status: 404 }, user: currentUser });
     }
-    if (!firebaseStorage) {
-      console.error('[PLAYER_ROUTE_ERROR] firebaseStorage is not available!');
-      return res.status(500).render('error', { message: 'Server configuration error (Firebase Storage)', error: { status: 500 }, user: currentUser });
-    }
-    if (!video.firebasePath) {
-        console.error(`[PLAYER_ROUTE_ERROR] Video with ID ${video._id} has no firebasePath.`);
-        return res.status(500).render('error', { message: 'Video data is incomplete (missing Firebase path)', error: { status: 500 }, user: currentUser });
-    }
+    // Videos from the first version were stored in Firebase Storage, which is no longer available.
+    const playable = Boolean(video.storageKey);
 
-    const videoRef = ref(firebaseStorage, video.firebasePath);
-    const videoUrl = await getDownloadURL(videoRef);
-
-    
     const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id } }) 
       .sort({ uploadedAt: -1 })
       .limit(5) 
@@ -72,38 +66,28 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     res.render('player', {
       title: video.title,
       description: video.description,
-      videoUrl,
+      playable,
       video,
       user: currentUser, 
       recommendedVideos 
     });
   } catch (err) {
     console.error('Error loading player page:', err);
-    res.status(500).render('error', { message: 'Server error' });
+    res.status(500).render('error', { message: 'Server error', error: { status: 500 }, user: currentUser });
   }
 });
 
 
+// Redirects the player to the media file in the storage.
 router.get('/stream/:id', async (req, res) => {
   try {
-    const video = await VideoMeta.findById(req.params.id);
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).send('Video not found');
+    const video = await VideoMeta.findById(req.params.id).select('storageKey').lean();
     if (!video) return res.status(404).send('Video not found');
-
-    if (!firebaseStorage) {
-      console.error('[STREAM_ROUTE_ERROR] firebaseStorage is not available!');
-      return res.status(500).send('Server configuration error (Firebase Storage)');
-    }
-    if (!video.firebasePath) {
-        console.error(`[STREAM_ROUTE_ERROR] Video with ID ${video._id} has no firebasePath.`);
-        return res.status(500).send('Video data is incomplete (missing Firebase path)');
-    }
-    const videoRef = ref(firebaseStorage, video.firebasePath);
-    const videoUrl = await getDownloadURL(videoRef);
-
-    
-    res.redirect(videoUrl);
+    if (!video.storageKey) return res.status(410).send('This video was stored in the old storage and is no longer available');
+    res.redirect(storage.getUrl(video.storageKey));
   } catch (err) {
-    console.error(err);
+    console.error('Error streaming video:', err);
     res.status(500).send('Server error');
   }
 });

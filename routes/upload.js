@@ -1,210 +1,100 @@
 const express = require('express');
 const multer = require('multer');
-const { ref, uploadBytes, getDownloadURL } = require('firebase/storage');
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const ffmpeg = require('fluent-ffmpeg');
+const { randomUUID } = require('crypto');
 
 const VideoMeta = require('../schemas/VideoMeta');
 const User = require('../schemas/userSchema');
 const verifyToken = require('../middlewares/verifyToken');
-const { firebaseStorage } = require('../firebase-init'); 
+const storage = require('../utils/storage');
+const { probe, makeThumbnail } = require('../utils/ffmpeg');
 
 const router = express.Router();
 
-const diskStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const tempDir = path.join(__dirname, '../temp_uploads'); 
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    cb(null, tempDir);
-  },
-  filename: function (req, file, cb) {
-    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
-  }
-});
+const TEMP_DIR = path.join(__dirname, '../temp_uploads');
+const MAX_SIZE = 1 * 1024 * 1024 * 1024; // 1 GB (direct multipart upload to storage comes later)
 
 const upload = multer({
-  storage: diskStorage, 
-  limits: { fileSize: 1 * 1024 * 1024 * 1024 },
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(TEMP_DIR, { recursive: true });
+      cb(null, TEMP_DIR);
+    },
+    filename: (req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+  }),
+  limits: { fileSize: MAX_SIZE },
   fileFilter: (req, file, cb) => {
-    console.log('[MULTER_DEBUG] File filter. Mimetype:', file.mimetype);
-    if (!file.mimetype.startsWith('video/')) {
-      console.log('[MULTER_DEBUG] File is not a video. Rejecting.');
-      return cb(new Error('Only video files are allowed'));
-    }
+    if (!file.mimetype.startsWith('video/')) return cb(new Error('Only video files are allowed'));
     cb(null, true);
-  }
+  },
 });
 
 router.post('/', verifyToken, (req, res, next) => {
   upload.single('video')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      console.error('[MULTER_ERROR] Multer error:', err);
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File too large. Max size is 1GB.' }); 
-      }
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File too large. Max size is 1GB.' });
       return res.status(400).json({ error: `File upload error: ${err.message}` });
-    } else if (err) {
-      console.error('[UPLOAD_ERROR] Non-Multer error during upload middleware:', err);
-      return res.status(400).json({ error: err.message });
     }
-
-    console.log('[MULTER_DEBUG] Multer processed file successfully. Calling next route handler.');
+    if (err) return res.status(400).json({ error: err.message });
     next();
   });
-}, async (req, res) => { 
-  console.log('[UPLOAD_DEBUG] Received request to /upload (after Multer).');
-  let tempFilePath = null; 
-  let thumbnailPath = null; 
-  const tempDir = path.join(__dirname, '../temp');
+}, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No video file uploaded' });
+
+  const tempVideo = req.file.path;
+  const videoId = randomUUID();
+  const thumbName = `${videoId}.jpg`;
+  const tempThumb = path.join(TEMP_DIR, thumbName);
 
   try {
-    console.log('[UPLOAD_DEBUG] Inside try block.');
-    if (!fs.existsSync(tempDir)) {
-      console.log('[UPLOAD_DEBUG] Temp directory does not exist. Creating:', tempDir);
-      fs.mkdirSync(tempDir, { recursive: true });
+    // Make sure the file really is a playable video (not only by its MIME type).
+    let duration = 0;
+    try {
+      const info = await probe(tempVideo);
+      if (!info.streams.some((s) => s.codec_type === 'video')) throw new Error('no video stream');
+      duration = Number(info.format.duration) || 0;
+    } catch (probeErr) {
+      return res.status(400).json({ error: 'The file is not a valid video', details: probeErr.message });
     }
 
-    if (!req.file) {
-      console.log('[UPLOAD_DEBUG] No video file uploaded.');
-      return res.status(400).json({ error: 'No video file uploaded' });
-    }
-    console.log('[UPLOAD_DEBUG] req.file:', JSON.stringify(req.file, (key, value) => key === 'buffer' ? 'Buffer(omitted)' : value));
-    console.log('[UPLOAD_DEBUG] req.body:', JSON.stringify(req.body));
+    await makeThumbnail(tempVideo, TEMP_DIR, thumbName, { at: Math.min(1, duration / 2) });
 
+    const ext = path.extname(req.file.filename) || '.mp4';
+    const videoKey = await storage.putFile(`videos/${videoId}/source${ext}`, tempVideo, { move: true });
+    const thumbKey = await storage.putFile(`videos/${videoId}/thumb.jpg`, tempThumb, { move: true });
 
-    const { path: uploadedVideoPath, originalname, mimetype, filename: multerFileName } = req.file;
-    const { title, description, tags, category } = req.body; 
-    const userId = req.user._id; 
-    console.log(`[UPLOAD_DEBUG] User ID: ${userId}, Title: ${title}`);
-    console.log(`[UPLOAD_DEBUG] Multer saved video to: ${uploadedVideoPath}`);
-
-    const firebaseVideoFileName = multerFileName; 
-    console.log(`[UPLOAD_DEBUG] Firebase video fileName: ${firebaseVideoFileName}`);
-    
-   
-    console.log('[UPLOAD_DEBUG] Attempting to upload video to Firebase from disk (readFileSync)...');
-    if (!firebaseStorage) { 
-      console.error('[UPLOAD_DEBUG] firebaseStorage (imported from firebase-init.js) is not initialized. Cannot upload video.');
-      throw new Error('Firebase Storage not available');
-    }
-    
-    console.log(`[UPLOAD_DEBUG] Reading file into buffer: ${uploadedVideoPath}`);
-    const videoFileBuffer = fs.readFileSync(uploadedVideoPath); 
-    console.log(`[UPLOAD_DEBUG] File read into buffer. Size: ${videoFileBuffer.length} bytes.`);
-
-    const videoRef = ref(firebaseStorage, `videos/${firebaseVideoFileName}`);
-    console.log(`[UPLOAD_DEBUG] Created videoRef: videos/${firebaseVideoFileName}`);
-    
-    console.log('[UPLOAD_DEBUG] Starting uploadBytes for video...');
-    await uploadBytes(videoRef, videoFileBuffer, { contentType: mimetype }); 
-    console.log('[UPLOAD_DEBUG] Video uploaded to Firebase successfully via uploadBytes.');
-    
-    const videoUrl = await getDownloadURL(videoRef);
-    console.log(`[UPLOAD_DEBUG] Got video download URL: ${videoUrl}`);
-
-    tempFilePath = uploadedVideoPath;
-    console.log(`[UPLOAD_DEBUG] Generating thumbnail from: ${tempFilePath}`);
-    const thumbnailName = `${uuidv4()}.jpg`;
-    thumbnailPath = path.join(tempDir, thumbnailName);
-    
-    await new Promise((resolve, reject) => {
-      ffmpeg(tempFilePath)
-        .screenshots({
-          timestamps: [1],
-          filename: thumbnailName,
-          folder: path.join(__dirname, '../temp'),
-          size: '320x180'
-        })
-        .on('end', () => {
-          console.log('[UPLOAD_DEBUG] Thumbnail generated successfully.');
-          resolve();
-        })
-        .on('error', (err) => {
-          console.error('[UPLOAD_DEBUG] ffmpeg error:', err);
-          reject(err);
-        });
-    });
-
-    console.log(`[UPLOAD_DEBUG] Reading thumbnail into buffer: ${thumbnailPath}`);
-    const thumbnailBuffer = fs.readFileSync(thumbnailPath);
-    console.log(`[UPLOAD_DEBUG] Thumbnail read into buffer. Size: ${thumbnailBuffer.length} bytes.`);
-
-    const thumbnailRef = ref(firebaseStorage, `thumbnails/${thumbnailName}`); 
-    console.log(`[UPLOAD_DEBUG] Created thumbnailRef: thumbnails/${thumbnailName}`);
-
-    console.log('[UPLOAD_DEBUG] Starting uploadBytes for thumbnail...');
-    await uploadBytes(thumbnailRef, thumbnailBuffer, { contentType: 'image/jpeg' }); 
-    console.log('[UPLOAD_DEBUG] Thumbnail uploaded to Firebase successfully via uploadBytes.');
-
-    const thumbnailUrl = await getDownloadURL(thumbnailRef); 
-    console.log(`[UPLOAD_DEBUG] Got thumbnail download URL: ${thumbnailUrl}`);
-
-    console.log('[UPLOAD_DEBUG] Attempting to save video metadata to MongoDB...');
+    const { title, description, tags, category } = req.body;
     const newVideo = new VideoMeta({
-      videoId: firebaseVideoFileName, 
+      videoId,
       title,
       description,
-      tags: tags ? tags.split(',').map(t => t.trim()) : [],
-      contentType: mimetype, 
-      firebasePath: `videos/${firebaseVideoFileName}`, 
-      thumbnailUrl,
-      user: userId,
-      category 
+      tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+      size: req.file.size,
+      duration,
+      contentType: req.file.mimetype,
+      storageDriver: storage.name,
+      storageKey: videoKey,
+      thumbnailKey: thumbKey,
+      thumbnailUrl: storage.getUrl(thumbKey),
+      user: req.user._id,
+      category,
     });
-
     await newVideo.save();
-    console.log('[UPLOAD_DEBUG] Video metadata saved to MongoDB.');
-    await User.findByIdAndUpdate(userId, { $push: { videos: newVideo._id } });
-    console.log('[UPLOAD_DEBUG] User document updated with new video ID.');
+    await User.findByIdAndUpdate(req.user._id, { $push: { videos: newVideo._id } });
 
-    res.status(201).json({
-      message: 'Video uploaded successfully',
-      videoId: newVideo._id,
-      thumbnailUrl
-    });
-    console.log('[UPLOAD_DEBUG] Response sent to client.');
+    res.status(201).json({ message: 'Video uploaded successfully', videoId: newVideo._id, thumbnailUrl: newVideo.thumbnailUrl });
   } catch (error) {
-    console.error('[UPLOAD_DEBUG] Catch block error:', error); 
+    console.error('[UPLOAD] failed:', error);
+    await storage.deletePrefix(`videos/${videoId}`).catch(() => {});
     res.status(500).json({ error: 'Failed to upload video', details: error.message });
   } finally {
-    if (tempFilePath) {
-      try {
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-          console.log('Successfully deleted Multer temp video file:', tempFilePath); 
-        }
-      } catch (e) {
-        console.error('Failed to delete Multer temp video file:', tempFilePath, e);
-      }
-    }
-    
-    if (thumbnailPath && fs.existsSync(thumbnailPath)) {
-      
-      if (thumbnailPath !== tempFilePath) {
-          try {
-            fs.unlinkSync(thumbnailPath);
-            console.log('Successfully deleted ffmpeg temp thumbnail file:', thumbnailPath);
-          } catch (e) {
-            console.error('Failed to delete ffmpeg temp thumbnail file:', thumbnailPath, e);
-          }
-      } else {
-        console.log('[UPLOAD_DEBUG] thumbnailPath is the same as tempFilePath, not deleting thumbnail separately to avoid double deletion.');
-      }
-    } else if (thumbnailPath) {
-        console.log('[UPLOAD_DEBUG] ffmpeg temp thumbnail file not found at:', thumbnailPath);
-      }
-    } 
+    for (const f of [tempVideo, tempThumb]) fs.promises.rm(f, { force: true }).catch(() => {});
+  }
 });
 
-router.get('/', verifyToken, (req, res) => { 
-  res.render('uploadPage', {
-    user: req.user, 
-    query: req.query.q || '' 
-  });
+router.get('/', verifyToken, (req, res) => {
+  res.render('uploadPage', { user: req.user, query: req.query.q || '' });
 });
 
 module.exports = router;

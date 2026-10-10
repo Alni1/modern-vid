@@ -2,3 +2,7 @@
 /.env
 /.vs*
 /serviceAccountKey.json
+/public/mvplayer
+/temp
+/temp_uploads
+/storage

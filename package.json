@@ -3,7 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www"
+    "prestart": "npm run build:player",
+    "start": "node ./bin/www",
+    "build": "npm run build:player",
+    "build:player": "node player/build.mjs",
+    "watch:player": "node player/build.mjs --watch",
+    "typecheck:player": "tsc -p player/tsconfig.json"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -27,10 +32,11 @@
     "morgan": "~1.9.1",
     "multer": "^2.0.0",
     "uuidv7": "^1.0.2",
-    "video.js": "^8.22.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "eslint": "^9.27.0"
+    "esbuild": "^0.27.7",
+    "eslint": "^9.27.0",
+    "typescript": "^6.0.3"
   }
 }

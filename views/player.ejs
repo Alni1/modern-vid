@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= title %> | ModernVid</title>
   <link href="/stylesheets/style.css" rel="stylesheet">
-  <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet">
-  <%# <link href="https://unpkg.com/videojs-resolution-switcher/lib/videojs-resolution-switcher.css" rel="stylesheet"> %>
+  <script type="module" src="/mvplayer/mvplayer.js"></script>
   <style>
-    /* .vjs-resolution-button .vjs-menu-button-popup .vjs-menu { */
-    /*   width: 5em; */ /* Adjust as needed */
-    /* } */
+    mv-player { margin-bottom: 12px; }
+    .video-unavailable {
+      aspect-ratio: 16 / 9; display: grid; place-items: center; padding: 1em; margin-bottom: 12px;
+      background: #111; color: #ddd; border-radius: 6px; text-align: center;
+    }
     .video-container { /* This style seems to be a leftover, not directly used by the player itself */
       max-width: 800px;
       margin: 20px auto;
@@ -58,15 +59,15 @@
       <% if (typeof video !== 'undefined' && video && video._id && video.contentType) { %>
         <div class="video-player-main-column">
           <%# <div style="margin-bottom: 10px;"> Removed Back button here </div> %>
-          <video-js id="my-player" class="vjs-default-skin vjs-big-play-centered" controls preload="auto" width="640" height="264">
-            <source src="/player/stream/<%= video._id %>" type="<%= video.contentType %>">
-            <p class="vjs-no-js">
-              To view this video please enable JavaScript, and consider upgrading to a
-              web browser that
-              <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
-            </p>
-          </video-js>
-          <%# Removed custom controls div and rewind button %>
+          <% if (playable) { %>
+            <mv-player id="my-player"
+                       src="/player/stream/<%= video._id %>"
+                       <% if (video.thumbnailUrl) { %>poster="<%= video.thumbnailUrl %>"<% } %>></mv-player>
+          <% } else { %>
+            <div class="video-unavailable">
+              This video was uploaded to the old storage and is no longer available.
+            </div>
+          <% } %>
         </div>
 
         <div class="video-details-column"> <!-- This will now be part of the left column -->
@@ -179,47 +180,7 @@
     </div>
   </div>
 
-  <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
-  <%# <script src="https://unpkg.com/videojs-resolution-switcher/lib/videojs-resolution-switcher.js"></script> %>
   <script>
-    // Only initialize player if the video element exists
-    if (document.getElementById('my-player')) {
-      const player = videojs('my-player', {
-        fluid: true,
-        responsive: true,
-        playbackRates: [0.5, 1, 1.5, 2]
-        // No custom plugins or complex source handling for the reverted version
-      });
-
-      player.ready(function() {
-        console.log('Video.js player is ready (reverted).');
-        
-        this.on('error', function() {
-          const error = player.error();
-          console.error('Video.js Error (reverted):', error);
-          // Optionally display a more user-friendly error message on the page
-          const errorDisplay = document.createElement('div');
-          errorDisplay.style.color = 'red';
-          errorDisplay.style.marginTop = '10px';
-          errorDisplay.style.textAlign = 'center';
-          errorDisplay.textContent = 'An error occurred while trying to play the video.';
-          if (error && error.message) {
-            errorDisplay.textContent += ' Details: ' + error.message;
-          }
-          const playerElement = document.getElementById('my-player');
-          if (playerElement && playerElement.parentElement) {
-             // Clear previous player children (like the <p> or previous errors) and add new error
-             while (playerElement.firstChild) {
-                playerElement.removeChild(playerElement.firstChild);
-             }
-            playerElement.appendChild(errorDisplay);
-          }
-        });
-      });
-    } else {
-      console.log('Video.js: Player element not found, skipping initialization (reverted).');
-    }
-
     // Handle Comment Submission (this part remains unchanged)
     const commentForm = document.getElementById('commentForm');
     if (commentForm) {

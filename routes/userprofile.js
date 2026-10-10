@@ -5,8 +5,7 @@ const VideoMeta = require('../schemas/VideoMeta');
 const User = require('../schemas/userSchema');
 const multer = require('multer');
 const path = require('path');
-const { firebaseStorage } = require('../firebase-init'); 
-const { ref, deleteObject, uploadBytes, getDownloadURL } = require('firebase/storage'); 
+const storage = require('../utils/storage');
 
 const avatarStorage = multer.memoryStorage(); 
 const avatarUpload = multer({
@@ -14,21 +13,15 @@ const avatarUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } 
 });
 
-const videoStorage = multer.diskStorage({
-  destination: './public/uploads/videos/',
-  filename: (req, file, cb) => {
-    
-    if (!req.user || !req.user._id) {
-      
-      return cb(new Error("User not authenticated or user ID is missing for video filename"));
-    }
-    cb(null, `video_${Date.now()}_${req.user._id}${path.extname(file.originalname)}`);
+/** Removes the media files of a video from the storage (legacy Firebase files are skipped). */
+async function deleteVideoFiles(video) {
+  if (!video.storageKey) return;
+  try {
+    await storage.deletePrefix(`videos/${video.videoId}`);
+  } catch (err) {
+    console.error(`Error deleting files of video ${video._id}:`, err);
   }
-});
-const videoUpload = multer({
-  storage: videoStorage,
-  limits: { fileSize: 500 * 1024 * 1024 } 
-});
+}
 
 
 router.get('/', verifyToken, async (req, res) => {
@@ -80,54 +73,20 @@ router.get('/', verifyToken, async (req, res) => {
 router.post('/avatar', verifyToken, avatarUpload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).send('No file uploaded');
+    if (!req.file.mimetype.startsWith('image/')) return res.status(400).send('Only images are allowed');
 
-    
-    const avatarFileName = `avatars/${req.user._id}${path.extname(req.file.originalname)}`;
-    const avatarRef = ref(firebaseStorage, avatarFileName);
+    const user = await User.findById(req.user._id).select('avatarUrl').lean();
+    const oldKey = user && storage.keyFromUrl(user.avatarUrl);
 
-
-    const metadata = {
-      contentType: req.file.mimetype,
-    };
-
-   
-    await uploadBytes(avatarRef, req.file.buffer, metadata);
-
-    
-    const avatarUrl = await getDownloadURL(avatarRef);
-
-    
-
-    
-    await User.findByIdAndUpdate(req.user._id, { avatarUrl: avatarUrl }); 
-    res.redirect('/userprofile');
-  } catch (err) {
-    console.error('Error uploading avatar to Firebase:', err);
-    res.status(500).send('Internal Server Error');
-  }
-});
-
-
-router.post('/upload', verifyToken, videoUpload.single('video'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).send('No video uploaded');
-
-    const newVideo = new VideoMeta({
-      videoId: req.file.filename,
-      title: req.body.title || 'Untitled',
-      description: req.body.description || '',
-      contentType: req.file.mimetype,
-      user: req.user._id, 
-      uploadedAt: new Date()
-    });
-
-    const savedVideo = await newVideo.save();
-
-    await User.findByIdAndUpdate(req.user._id, { $push: { videos: savedVideo._id } }); 
+    // A new key every time, so browsers do not show a cached old avatar.
+    const key = `avatars/${req.user._id}-${Date.now()}${path.extname(req.file.originalname).toLowerCase()}`;
+    await storage.putBuffer(key, req.file.buffer);
+    await User.findByIdAndUpdate(req.user._id, { avatarUrl: storage.getUrl(key) });
+    if (oldKey) await storage.delete(oldKey).catch(() => {});
 
     res.redirect('/userprofile');
   } catch (err) {
-    console.error('Error uploading video:', err);
+    console.error('Error uploading avatar:', err);
     res.status(500).send('Internal Server Error');
   }
 });
@@ -147,30 +106,7 @@ router.post('/video/delete/:videoId', verifyToken, async (req, res) => {
     }
 
     
-    if (video.firebasePath) {
-      try {
-        const videoFileRef = ref(firebaseStorage, video.firebasePath);
-        await deleteObject(videoFileRef);
-        console.log(`Successfully deleted video from Firebase: ${video.firebasePath}`);
-      } catch (fbError) {
-        console.error(`Error deleting video from Firebase (${video.firebasePath}):`, fbError);
-      }
-    }
-
-    if (video.thumbnailUrl) {
-      try {
-        const urlParts = video.thumbnailUrl.split('/o/');
-        if (urlParts.length > 1) {
-          const encodedPath = urlParts[1].split('?')[0];
-          const thumbnailPath = decodeURIComponent(encodedPath); 
-          const thumbnailFileRef = ref(firebaseStorage, thumbnailPath);
-          await deleteObject(thumbnailFileRef);
-          console.log(`Successfully deleted thumbnail from Firebase: ${thumbnailPath}`);
-        }
-      } catch (fbError) {
-        console.error(`Error deleting thumbnail from Firebase (${video.thumbnailUrl}):`, fbError);
-      }
-    }
+    await deleteVideoFiles(video);
     await VideoMeta.deleteOne({ _id: videoId, user: userId });
     await User.findByIdAndUpdate(userId, { $pull: { videos: videoId } });
 
@@ -188,30 +124,11 @@ router.post('/deleteUser', verifyToken, async (req, res) => {
     const videosToDelete = await VideoMeta.find({ user: userId });
 
     for (const video of videosToDelete) {
-      if (video.firebasePath) {
-        try {
-          const videoFileRef = ref(firebaseStorage, video.firebasePath);
-          await deleteObject(videoFileRef);
-          console.log(`Successfully deleted video from Firebase during user deletion: ${video.firebasePath}`);
-        } catch (fbError) {
-          console.error(`Error deleting video from Firebase (${video.firebasePath}) during user deletion:`, fbError);
-        }
-      }
-      if (video.thumbnailUrl) {
-        try {
-          const urlParts = video.thumbnailUrl.split('/o/');
-          if (urlParts.length > 1) {
-            const encodedPath = urlParts[1].split('?')[0];
-            const thumbnailPath = decodeURIComponent(encodedPath);
-            const thumbnailFileRef = ref(firebaseStorage, thumbnailPath);
-            await deleteObject(thumbnailFileRef);
-            console.log(`Successfully deleted thumbnail from Firebase during user deletion: ${thumbnailPath}`);
-          }
-        } catch (fbError) {
-          console.error(`Error deleting thumbnail from Firebase (${video.thumbnailUrl}) during user deletion:`, fbError);
-        }
-      }
+      await deleteVideoFiles(video);
     }
+    const user = await User.findById(userId).select('avatarUrl').lean();
+    const avatarKey = user && storage.keyFromUrl(user.avatarUrl);
+    if (avatarKey) await storage.delete(avatarKey).catch(() => {});
     await VideoMeta.deleteMany({ user: userId });
     await User.findByIdAndDelete(userId);
 

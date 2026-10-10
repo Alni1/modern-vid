@@ -17,8 +17,8 @@
         </a>
     </div>
 </div>
-<h1 id="error-text"><%=message%></h1>
-<h1 id="error-text-status"><%=error.status%></h2>
+<h1 id="error-text"><%= typeof message !== 'undefined' ? message : 'Error' %></h1>
+<h2 id="error-text-status"><%= (typeof error !== 'undefined' && error && error.status) ? error.status : '' %></h2>
 <script src="pages/index.js"></script>
 </body>
 </html>

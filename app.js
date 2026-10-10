@@ -3,7 +3,7 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var mongoose = require('mongoose');
-const { firebaseApp, firebaseStorage } = require('./firebase-init');
+const storage = require('./utils/storage');
 
 require('dotenv').config();
 
@@ -29,10 +29,7 @@ var registrationRouter = require('./routes/registration');
 var loginRouter = require('./routes/login');
 const { validateHeaderName } = require('http');
 
-mongoose.connect(process.env.MONGODB_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+mongoose.connect(process.env.MONGODB_URL)
 .then(() => console.log('MongoDB connected'))
 .catch((err) => console.error('MongoDB connection error:', err));
 var app = express();
@@ -44,6 +41,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+// Media files (videos, thumbnails, avatars) from the local storage driver.
+// Registered before the rate limiter: a single video playback issues many range requests.
+if (storage.name === 'local') app.use('/media', storage.middleware());
 app.use(limiter);
 
 app.use('/', indexRouter);
