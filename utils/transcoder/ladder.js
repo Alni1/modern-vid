@@ -3,7 +3,11 @@
  * "p" values refer to the shorter side, so portrait videos get the same ladder.
  * Renditions above the source resolution are skipped (no upscaling);
  * at least one rendition is always produced.
+ * High frame rates (50/60 fps) are kept only for 720p and above, like on large platforms:
+ * small renditions are watched on small screens/slow networks, and halving their frame
+ * rate almost halves their encoding time and bitrate needs.
  */
+const HFR_MIN_SHORT = 720;
 const LADDER = [
   { name: '1080p', short: 1080, videoKbps: 5000, audioKbps: 128 },
   { name: '720p', short: 720, videoKbps: 2800, audioKbps: 128 },
@@ -16,8 +20,8 @@ function even(n) {
 }
 
 /**
- * @param {{width:number,height:number}} source displayed source size (rotation applied)
- * @returns {Array<{name,width,height,videoKbps,audioKbps}>} renditions, highest first
+ * @param {{width:number,height:number,fps?:number}} source displayed source size (rotation applied)
+ * @returns {Array<{name,width,height,fps,videoKbps,audioKbps}>} renditions, highest first
  */
 function buildLadder(source) {
   const short = Math.min(source.width, source.height);
@@ -32,6 +36,7 @@ function buildLadder(source) {
       name: s.name,
       width: even(source.width * f),
       height: even(source.height * f),
+      fps: s.short >= HFR_MIN_SHORT ? source.fps || 30 : Math.min(source.fps || 30, 30),
       videoKbps: s.videoKbps,
       audioKbps: s.audioKbps,
     };

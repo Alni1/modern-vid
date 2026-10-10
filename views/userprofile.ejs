@@ -65,6 +65,8 @@
                   <% } %>
                   <% if (video.status === 'processing') { %>
                     <span class="video-status-badge">Processing <%= Math.round((video.processingProgress || 0) * 100) %>%</span>
+                  <% } else if (video.status === 'ready' && video.hls && video.hls.masterKey && video.processingProgress < 1) { %>
+                    <span class="video-status-badge">HD processing <%= Math.round(video.processingProgress * 100) %>%</span>
                   <% } else if (video.status === 'failed') { %>
                     <span class="video-status-badge video-status-failed" title="<%= video.processingError || '' %>">Original quality only</span>
                   <% } %>
@@ -247,4 +249,4 @@
     }
   </script>
 </body>
-</html>
+</html>

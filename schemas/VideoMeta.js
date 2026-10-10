@@ -19,7 +19,7 @@ const videoMetaSchema = new mongoose.Schema({
   processingError: String,
   hls: {
     masterKey: String,
-    renditions: [{ _id: false, name: String, width: Number, height: Number, videoKbps: Number, audioKbps: Number }],
+    renditions: [{ _id: false, name: String, width: Number, height: Number, fps: Number, videoKbps: Number, audioKbps: Number }],
   },
   // Legacy: videos uploaded to Firebase Storage by the first version of the platform.
   firebasePath: String,

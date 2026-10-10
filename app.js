@@ -1,3 +1,6 @@
+// Load .env before any module reads process.env (e.g. FFMPEG_PATH in the transcoder).
+require('dotenv').config();
+
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -6,7 +9,6 @@ var mongoose = require('mongoose');
 const storage = require('./utils/storage');
 const { startWorker } = require('./utils/transcoder/worker');
 
-require('dotenv').config();
 
 
 const logoutRouter = require('./routes/logout');
@@ -77,4 +79,4 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-module.exports = app; // Export only the app instance
+module.exports = app; // Export only the app instance

@@ -1,17 +1,20 @@
 const ffmpeg = require('fluent-ffmpeg');
 
-// Use the binaries bundled with @ffmpeg-installer / @ffprobe-installer so that
-// FFmpeg does not have to be installed system-wide. Falls back to PATH if missing.
-try {
-  ffmpeg.setFfmpegPath(require('@ffmpeg-installer/ffmpeg').path);
-} catch (err) {
-  console.warn('[ffmpeg] bundled ffmpeg not found, using the one from PATH');
+// FFMPEG_PATH / FFPROBE_PATH select a system-wide FFmpeg (recommended: a current build
+// with GPU support). Otherwise the binaries bundled with @ffmpeg-installer /
+// @ffprobe-installer are used, and as the last resort the ones from PATH.
+function pick(envName, pkg) {
+  if (process.env[envName]) return process.env[envName];
+  try {
+    return require(pkg).path;
+  } catch {
+    return null;
+  }
 }
-try {
-  ffmpeg.setFfprobePath(require('@ffprobe-installer/ffprobe').path);
-} catch (err) {
-  console.warn('[ffmpeg] bundled ffprobe not found, using the one from PATH');
-}
+const ffmpegPath = pick('FFMPEG_PATH', '@ffmpeg-installer/ffmpeg');
+const ffprobePath = pick('FFPROBE_PATH', '@ffprobe-installer/ffprobe');
+if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath);
+if (ffprobePath) ffmpeg.setFfprobePath(ffprobePath);
 
 /** Reads media information (duration, streams) of a file. */
 function probe(filePath) {

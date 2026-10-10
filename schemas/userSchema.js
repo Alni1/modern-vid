@@ -1,3 +1,4 @@
+const debug = require('../utils/debug');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jsonWT = require('jsonwebtoken');
@@ -24,25 +25,25 @@ let userSchema = new mongoose.Schema({
 
 userSchema.pre("save", async function (next) {
   const user = this;
-  console.log('[USER_SCHEMA_PRE_SAVE] Entered pre-save hook for user:', user.login);
+  debug('[USER_SCHEMA_PRE_SAVE] Entered pre-save hook for user:', user.login);
 
   if (!user.uuid) {
     user.uuid = uuidv7.uuidv7();
-    console.log('[USER_SCHEMA_PRE_SAVE] Generated uuid:', user.uuid);
+    debug('[USER_SCHEMA_PRE_SAVE] Generated uuid:', user.uuid);
   }
 
   if (!user.timestamp) {
     user.timestamp = new Date();
-    console.log('[USER_SCHEMA_PRE_SAVE] Generated timestamp:', user.timestamp);
+    debug('[USER_SCHEMA_PRE_SAVE] Generated timestamp:', user.timestamp);
   }
 
   if (user.isModified("password") || user.isNew) {
     if (user.password && user.password.length >= 6) { // Добавим проверку длины перед хешированием
-        console.log('[USER_SCHEMA_PRE_SAVE] Hashing password for user:', user.login);
+        debug('[USER_SCHEMA_PRE_SAVE] Hashing password for user:', user.login);
         user.password = await bcrypt.hash(user.password, 8);
     } else if (user.isNew && (!user.password || user.password.length < 6)) {
 
-        console.log('[USER_SCHEMA_PRE_SAVE] Password for new user does not meet length requirement, will let schema validation handle it.');
+        debug('[USER_SCHEMA_PRE_SAVE] Password for new user does not meet length requirement, will let schema validation handle it.');
     }
   }
 
@@ -52,11 +53,11 @@ userSchema.pre("save", async function (next) {
       id: user.uuid, 
       login: user.login
     };
-    console.log('[USER_SCHEMA_PRE_SAVE] Generating JWT with payload:', payload);
-    console.log('[USER_SCHEMA_PRE_SAVE] SECRET_KEY for JWT:', process.env.SECRET_KEY ? 'Exists' : 'MISSING!');
+    debug('[USER_SCHEMA_PRE_SAVE] Generating JWT with payload:', payload);
+    debug('[USER_SCHEMA_PRE_SAVE] SECRET_KEY for JWT:', process.env.SECRET_KEY ? 'Exists' : 'MISSING!');
     if (process.env.SECRET_KEY) {
         user.JWT = jsonWT.sign(payload, process.env.SECRET_KEY);
-        console.log('[USER_SCHEMA_PRE_SAVE] Generated JWT:', user.JWT ? 'Success' : 'Failed or Undefined');
+        debug('[USER_SCHEMA_PRE_SAVE] Generated JWT:', user.JWT ? 'Success' : 'Failed or Undefined');
     } else {
         console.error('[USER_SCHEMA_PRE_SAVE] SECRET_KEY is missing. Cannot generate JWT.');
 

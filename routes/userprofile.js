@@ -1,3 +1,4 @@
+const debug = require('../utils/debug');
 const express = require('express');
 const router = express.Router();
 const verifyToken = require('../middlewares/verifyToken');
@@ -25,35 +26,35 @@ async function deleteVideoFiles(video) {
 
 
 router.get('/', verifyToken, async (req, res) => {
-  console.log('[USERPROFILE_ROUTE_DEBUG] Entered /userprofile GET handler.');
-  console.log('[USERPROFILE_ROUTE_DEBUG] req.user from verifyToken:', JSON.stringify(req.user, null, 2));
+  debug('[USERPROFILE_ROUTE_DEBUG] Entered /userprofile GET handler.');
+  debug('[USERPROFILE_ROUTE_DEBUG] req.user from verifyToken:', JSON.stringify(req.user, null, 2));
 
   
   if (!req.user || !req.user._id) {
-    console.log('[USERPROFILE_ROUTE_DEBUG] req.user or req.user._id is missing after verifyToken. This should not happen. Redirecting.');
+    debug('[USERPROFILE_ROUTE_DEBUG] req.user or req.user._id is missing after verifyToken. This should not happen. Redirecting.');
     return res.clearCookie('token').redirect('/login');
   }
 
   try {
    
-    console.log('[USERPROFILE_ROUTE_DEBUG] Attempting to find user in DB with ID:', req.user._id);
+    debug('[USERPROFILE_ROUTE_DEBUG] Attempting to find user in DB with ID:', req.user._id);
     const userFromDB = await User.findById(req.user._id).populate('videos').lean();
     
     if (!userFromDB) {
       
-      console.log('[USERPROFILE_ROUTE_DEBUG] User not found in DB within route handler for ID:', req.user._id, '. Clearing cookie and redirecting.');
+      debug('[USERPROFILE_ROUTE_DEBUG] User not found in DB within route handler for ID:', req.user._id, '. Clearing cookie and redirecting.');
       return res.clearCookie('token').redirect('/login');
     }
-    console.log('[USERPROFILE_ROUTE_DEBUG] User successfully fetched from DB in route handler.');
-    console.log('[USERPROFILE_ROUTE_DEBUG] userFromDB after populate, before lean (raw Mongoose doc):', userFromDB); // Log before .lean() if possible, or just the lean object
-    console.log('[USERPROFILE_ROUTE_DEBUG] userFromDB.videos after populate:', JSON.stringify(userFromDB ? userFromDB.videos : "userFromDB is null", null, 2));
-    console.log('[USERPROFILE_ROUTE_DEBUG] Type of userFromDB.videos:', userFromDB ? typeof userFromDB.videos : "userFromDB is null");
+    debug('[USERPROFILE_ROUTE_DEBUG] User successfully fetched from DB in route handler.');
+    debug('[USERPROFILE_ROUTE_DEBUG] userFromDB after populate, before lean (raw Mongoose doc):', userFromDB); // Log before .lean() if possible, or just the lean object
+    debug('[USERPROFILE_ROUTE_DEBUG] userFromDB.videos after populate:', JSON.stringify(userFromDB ? userFromDB.videos : "userFromDB is null", null, 2));
+    debug('[USERPROFILE_ROUTE_DEBUG] Type of userFromDB.videos:', userFromDB ? typeof userFromDB.videos : "userFromDB is null");
     if(userFromDB && Array.isArray(userFromDB.videos)) {
       userFromDB.videos.forEach((video, index) => {
-        console.log(`[USERPROFILE_ROUTE_DEBUG] Video ${index}:`, JSON.stringify(video, null, 2));
-        console.log(`[USERPROFILE_ROUTE_DEBUG] Video ${index} _id:`, video._id);
-        console.log(`[USERPROFILE_ROUTE_DEBUG] Video ${index} title:`, video.title);
-        console.log(`[USERPROFILE_ROUTE_DEBUG] Video ${index} thumbnailUrl:`, video.thumbnailUrl);
+        debug(`[USERPROFILE_ROUTE_DEBUG] Video ${index}:`, JSON.stringify(video, null, 2));
+        debug(`[USERPROFILE_ROUTE_DEBUG] Video ${index} _id:`, video._id);
+        debug(`[USERPROFILE_ROUTE_DEBUG] Video ${index} title:`, video.title);
+        debug(`[USERPROFILE_ROUTE_DEBUG] Video ${index} thumbnailUrl:`, video.thumbnailUrl);
       });
     }
 

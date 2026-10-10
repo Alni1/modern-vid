@@ -12,6 +12,7 @@
       aspect-ratio: 16 / 9; display: grid; place-items: center; padding: 1em; margin-bottom: 12px;
       background: #111; color: #ddd; border-radius: 6px; text-align: center;
     }
+    .processing-hint { margin: 0 0 8px; font-size: .9em; color: #666; }
     .processing-bar { width: min(320px, 70vw); height: 6px; margin: 12px auto; border-radius: 3px; background: #333; overflow: hidden; }
     .processing-bar > div { height: 100%; background: #ff3d3d; transition: width .5s ease; }
     .video-container { /* This style seems to be a leftover, not directly used by the player itself */
@@ -70,6 +71,9 @@
               </div>
             </div>
           <% } else if (playable) { %>
+            <% if (hlsUrl && video.processingProgress !== undefined && video.processingProgress < 1) { %>
+              <p class="processing-hint">Higher qualities are still being processed (<%= Math.round(video.processingProgress * 100) %>%) and will appear after a page reload.</p>
+            <% } %>
             <mv-player id="my-player"
                        src="<%= hlsUrl || progressiveUrl %>"
                        <% if (hlsUrl) { %>fallback-src="<%= progressiveUrl %>"<% } %>
@@ -322,4 +326,4 @@
     // Removed Rewind button functionality script
   </script>
 </body>
-</html>
+</html>
