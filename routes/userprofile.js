@@ -7,6 +7,8 @@ const User = require('../schemas/userSchema');
 const multer = require('multer');
 const path = require('path');
 const storage = require('../utils/storage');
+const { loadPreset } = require('./presets');
+const PlayerPreset = require('../schemas/PlayerPreset');
 
 const avatarStorage = multer.memoryStorage(); 
 const avatarUpload = multer({
@@ -64,7 +66,17 @@ router.get('/', verifyToken, async (req, res) => {
     }
     
     
-    res.render('userprofile', { user: userFromDB, title: 'User Profile', query: req.query.q || '' });
+    // Channel player theme editor: current theme and a video for the live preview.
+    const authorConfig = await loadPreset(userFromDB._id, 'author');
+    const previewVideo = userFromDB.videos.find((v) => v.status === 'ready' && v.hls && v.hls.masterKey);
+    res.render('userprofile', {
+      user: userFromDB,
+      title: 'User Profile',
+      query: req.query.q || '',
+      channelTheme: (authorConfig && authorConfig.theme) || {},
+      previewSrc: previewVideo ? storage.getUrl(previewVideo.hls.masterKey) : null,
+      previewPoster: previewVideo ? previewVideo.thumbnailUrl : null,
+    });
   } catch (err) {
     console.error('Error loading user profile:', err);
     res.status(500).send('Internal Server Error');
@@ -131,6 +143,7 @@ router.post('/deleteUser', verifyToken, async (req, res) => {
     const avatarKey = user && storage.keyFromUrl(user.avatarUrl);
     if (avatarKey) await storage.delete(avatarKey).catch(() => {});
     await VideoMeta.deleteMany({ user: userId });
+    await PlayerPreset.deleteMany({ owner: userId });
     await User.findByIdAndDelete(userId);
 
     res.clearCookie('token');

@@ -77,7 +77,9 @@
             <mv-player id="my-player"
                        src="<%= hlsUrl || progressiveUrl %>"
                        <% if (hlsUrl) { %>fallback-src="<%= progressiveUrl %>"<% } %>
-                       <% if (video.thumbnailUrl) { %>poster="<%= video.thumbnailUrl %>"<% } %>></mv-player>
+                       <% if (video.thumbnailUrl) { %>poster="<%= video.thumbnailUrl %>"<% } %>
+                       <% if (authorTheme) { %>author-theme="<%= JSON.stringify(authorTheme) %>"<% } %>
+                       <% if (viewerPreset) { %>preset="<%= JSON.stringify(viewerPreset) %>"<% } %>></mv-player>
           <% } else { %>
             <div class="video-unavailable">
               This video was uploaded to the old storage and is no longer available.
@@ -212,6 +214,23 @@
         setTimeout(poll, 3000);
       };
       setTimeout(poll, 3000);
+    }
+
+    // Player settings of a signed-in viewer are saved on the server (debounced),
+    // so they follow the viewer to other browsers and devices.
+    const mvPlayer = document.getElementById('my-player');
+    if (mvPlayer && mvPlayer.hasAttribute('preset')) {
+      let saveTimer = 0;
+      mvPlayer.addEventListener('mv-preset-change', (e) => {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          fetch('/api/presets/me', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preset: e.detail.preset }),
+          }).catch(() => { /* the preset stays in the browser and is sent with the next change */ });
+        }, 800);
+      });
     }
 
     // Handle Comment Submission (this part remains unchanged)

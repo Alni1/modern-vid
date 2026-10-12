@@ -17,5 +17,6 @@ export const icons = {
   muted: svg('M4 9h4l5-4v14l-5-4H4z', 'M16 9l5 6M21 9l-5 6'),
   fullscreen: svg('', 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5'),
   exitFullscreen: svg('', 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5'),
+  settings: svg('', 'M4 7h9M17 7h3M15 4.5v5M4 17h3M11 17h9M9 14.5v5'),
   pip: svg('M12 12h7v5h-7z', 'M3 5h18v14H3z'),
 };

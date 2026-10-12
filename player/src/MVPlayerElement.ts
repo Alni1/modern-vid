@@ -3,10 +3,30 @@ import { resolveConfig } from './config/merge';
 import type { AuthorPreset, PlayerConfig, ViewerPreset } from './config/types';
 import { controlRegistry, type Control, type ControlContext } from './ui/controls';
 import { ProgressBar } from './ui/ProgressBar';
+import { SettingsPanel } from './ui/SettingsPanel';
 import { PLAYER_CSS, themeVariables } from './ui/styles';
 import { icons } from './ui/icons';
 import { buildKeyMap, runAction } from './hotkeys';
 import { storage } from './storage';
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** Returns a copy of `obj` with `value` written at `path` (undefined removes the key and empty parents). */
+function withPath(obj: Record<string, unknown>, path: string[], value: unknown): Record<string, unknown> {
+  const [key, ...rest] = path;
+  const out = { ...obj };
+  if (rest.length === 0) {
+    if (value === undefined) delete out[key];
+    else out[key] = value;
+    return out;
+  }
+  const child = withPath(isPlainObject(out[key]) ? (out[key] as Record<string, unknown>) : {}, rest, value);
+  if (Object.keys(child).length) out[key] = child;
+  else delete out[key];
+  return out;
+}
 
 function parseJson<T>(value: string | null): T | null {
   if (!value) return null;
@@ -27,7 +47,14 @@ function parseJson<T>(value: string | null): T | null {
  *  - poster        poster image URL
  *  - author-theme  JSON with the channel author's theme (appearance only)
  *  - preset        JSON with the viewer's saved preset (from the server);
- *                  when absent the preset stored in the browser is used
+ *                  when absent or empty the preset stored in the browser is used
+ *  - preview       boolean: preview mode (e.g. the channel theme editor) — the viewer's
+ *                  stored settings are neither applied nor changed
+ *
+ * Events:
+ *  - mv-ready          metadata loaded
+ *  - mv-preset-change  the viewer changed a setting; detail.preset is the new viewer preset
+ *                      (the page can save it on the server)
  */
 export class MVPlayerElement extends HTMLElement {
   static observedAttributes = ['src', 'fallback-src', 'poster', 'author-theme', 'preset'];
@@ -48,6 +75,7 @@ export class MVPlayerElement extends HTMLElement {
     progressSlot: HTMLDivElement;
     stats: HTMLDivElement;
   };
+  private settings!: SettingsPanel;
   private keyMap = new Map<string, string>();
   private statsTimer = 0;
   private lastThroughputSave = 0;
@@ -86,7 +114,15 @@ export class MVPlayerElement extends HTMLElement {
     if (!this.built || oldValue === value) return;
     if (name === 'src' && value) void this.loadSource(value);
     if (name === 'poster') this.video.poster = value ?? '';
-    if (name === 'author-theme' || name === 'preset') this.applyConfig();
+    if (name === 'preset') {
+      const p = parseJson<ViewerPreset>(value);
+      if (p && Object.keys(p).length) this.setViewerPreset(p);
+      return;
+    }
+    if (name === 'author-theme') {
+      this.applyConfig();
+      this.settings.render();
+    }
   }
 
   /** Applies a viewer preset immediately and stores it in the browser. */
@@ -94,6 +130,31 @@ export class MVPlayerElement extends HTMLElement {
     this.viewerPreset = preset;
     if (persist) storage.savePreset(preset);
     this.applyConfig();
+    this.settings?.render();
+  }
+
+  /** The viewer's own settings (only the values that differ from the defaults). */
+  getViewerPreset(): ViewerPreset {
+    return this.viewerPreset ?? {};
+  }
+
+  /** Opens or closes the settings panel. */
+  toggleSettings(force?: boolean): void {
+    if (force === true) this.settings.open();
+    else if (force === false) this.settings.close();
+    else this.settings.toggle();
+  }
+
+  /** Changes one viewer setting, applies it and notifies the page. */
+  private updatePreset(preset: ViewerPreset): void {
+    this.viewerPreset = preset;
+    if (this.hasAttribute('preview')) {
+      this.applyConfig();
+      return;
+    }
+    storage.savePreset(preset);
+    this.applyConfig();
+    this.dispatchEvent(new CustomEvent('mv-preset-change', { detail: { preset }, bubbles: true }));
   }
 
   /** QoE metrics of the current session (startup time, stalls, switches, bitrate, QoE score). */
@@ -151,7 +212,20 @@ export class MVPlayerElement extends HTMLElement {
       '<div class="mv-progress-slot"></div>' +
       '<div class="mv-bar"><div class="mv-group mv-left"></div><div class="mv-group mv-right"></div></div>';
 
-    this.shadow.append(style, this.video, overlay, error, stats, controls);
+    this.settings = new SettingsPanel({
+      config: () => this._config,
+      preset: () => this.getViewerPreset(),
+      hasAuthorTheme: () => Boolean(parseJson<AuthorPreset['theme']>(this.getAttribute('author-theme'))),
+      set: (path, value) => this.updatePreset(withPath(this.getViewerPreset() as Record<string, unknown>, path, value) as ViewerPreset),
+      replacePreset: (preset) => this.updatePreset(preset),
+      onToggle: (open) => {
+        if (this._core) this.render(this._core.state);
+        if (open) this.wake();
+        else this.focus();
+      },
+    });
+
+    this.shadow.append(style, this.video, overlay, error, stats, controls, this.settings.el);
     this.els = {
       bar: controls.querySelector('.mv-bar') as HTMLDivElement,
       left: controls.querySelector('.mv-left') as HTMLDivElement,
@@ -176,7 +250,21 @@ export class MVPlayerElement extends HTMLElement {
     this.progress = new ProgressBar(core);
     this.els.progressSlot.append(this.progress.el);
 
-    this.viewerPreset = parseJson<ViewerPreset>(this.getAttribute('preset')) ?? storage.loadPreset();
+    // A preset from the server (signed-in viewer) wins; otherwise the one saved in this browser.
+    const serverPreset = parseJson<ViewerPreset>(this.getAttribute('preset'));
+    const localPreset = storage.loadPreset();
+    if (this.hasAttribute('preview')) {
+      this.viewerPreset = {};
+    } else if (serverPreset && Object.keys(serverPreset).length) {
+      this.viewerPreset = serverPreset;
+      storage.savePreset(serverPreset);
+    } else {
+      this.viewerPreset = localPreset;
+      // Signed in for the first time with local settings: let the page upload them.
+      if (this.hasAttribute('preset') && localPreset && Object.keys(localPreset).length) {
+        queueMicrotask(() => this.dispatchEvent(new CustomEvent('mv-preset-change', { detail: { preset: localPreset }, bubbles: true })));
+      }
+    }
     this.applyConfig();
     this.restorePrefs();
     this.lastSaved = { volume: this.video.volume, muted: this.video.muted, rate: this.video.playbackRate };
@@ -188,6 +276,10 @@ export class MVPlayerElement extends HTMLElement {
     });
 
     overlay.addEventListener('click', (e) => {
+      if (this.settings.isOpen) {
+        this.settings.close();
+        return;
+      }
       if (e.target === overlay || e.target === this.els.bigPlay || this.els.bigPlay.contains(e.target as Node)) {
         core.togglePlay();
       }
@@ -257,6 +349,12 @@ export class MVPlayerElement extends HTMLElement {
   private applyConfig(): void {
     const author = parseJson<AuthorPreset>(this.getAttribute('author-theme'));
     this._config = resolveConfig(author ? { theme: author as AuthorPreset['theme'] } : null, this.viewerPreset);
+    // The settings button cannot be removed in the panel; presets saved before it existed get it back.
+    const { left, right } = this._config.layout;
+    if (!left.includes('settings') && !right.includes('settings')) {
+      const at = right.indexOf('fullscreen');
+      this._config.layout.right = at >= 0 ? [...right.slice(0, at), 'settings', ...right.slice(at)] : [...right, 'settings'];
+    }
     const vars = themeVariables(this._config.theme);
     Object.entries(vars).forEach(([k, v]) => this.style.setProperty(k, v));
     this.keyMap = buildKeyMap(this._config.hotkeys);
@@ -270,7 +368,11 @@ export class MVPlayerElement extends HTMLElement {
     this.controls = [];
     this.els.left.replaceChildren();
     this.els.right.replaceChildren();
-    const ctx: ControlContext = { core: this._core as PlayerCore, config: this._config };
+    const ctx: ControlContext = {
+      core: this._core as PlayerCore,
+      config: this._config,
+      ui: { toggleSettings: () => this.toggleSettings(), settingsOpen: () => this.settings.isOpen },
+    };
     const place = (ids: string[], target: HTMLElement): void => {
       ids.forEach((id) => {
         const factory = controlRegistry.get(id);
@@ -342,7 +444,7 @@ export class MVPlayerElement extends HTMLElement {
     const layout = this._config?.layout;
     if (!layout?.autoHide || !this._core || this._core.video.paused) return;
     this.idleTimer = window.setTimeout(() => {
-      const menuOpen = this.shadow.querySelector('.mv-menu:not([hidden])');
+      const menuOpen = this.shadow.querySelector('.mv-menu:not([hidden]), .mv-settings:not([hidden])');
       if (!menuOpen && this._core && !this._core.video.paused) this.setAttribute('data-idle', '');
     }, delay ?? layout.autoHideDelay);
   }
@@ -350,8 +452,8 @@ export class MVPlayerElement extends HTMLElement {
   private onKeyDown = (e: KeyboardEvent): void => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const target = e.composedPath()[0] as HTMLElement | undefined;
-    // Let menus and the volume slider handle their own keys.
-    if (target?.closest?.('.mv-menu') || (target instanceof HTMLInputElement && e.key.startsWith('Arrow'))) return;
+    // Let menus, the settings panel and the volume slider handle their own keys.
+    if (target?.closest?.('.mv-menu, .mv-settings') || (target instanceof HTMLInputElement && e.key.startsWith('Arrow'))) return;
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     const action = this.keyMap.get(key);
     if (!action || !this._core) return;

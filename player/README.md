@@ -27,9 +27,18 @@ npm run typecheck:player
 | `fallback-src` | звичайний файл, якщо адаптивний потік відтворити неможливо |
 | `poster` | обкладинка |
 | `author-theme` | JSON з темою автора каналу (лише оформлення) |
-| `preset` | JSON з пресетом глядача з сервера; якщо немає — береться збережений у браузері |
+| `preset` | JSON з пресетом глядача з сервера; якщо немає або порожній — береться збережений у браузері |
+| `preview` | режим попереднього перегляду (редактор теми каналу): налаштування глядача не застосовуються і не змінюються |
 
-JS API: `el.core` (ядро: `play`, `pause`, `seek`, `setRate`, `levels`, `setLevel(i | -1)`, `stats()`, `bus.on('state' | 'levelSwitch' | 'segment', …)`), `el.config`, `el.setViewerPreset(preset)`, `el.qoe()` (метрики QoE сеансу), `el.toggleStats()` (панель статистики, клавіша `i`).
+JS API: `el.core` (ядро: `play`, `pause`, `seek`, `setRate`, `levels`, `setLevel(i | -1)`, `stats()`, `bus.on('state' | 'levelSwitch' | 'segment', …)`), `el.config`, `el.setViewerPreset(preset)`, `el.qoe()` (метрики QoE сеансу), `el.toggleStats()` (панель статистики, клавіша `i`), `el.toggleSettings()` (панель налаштувань, клавіша `s`), `el.getViewerPreset()`.
+
+Події: `mv-ready` (завантажено метадані), `mv-preset-change` (глядач змінив налаштування; `detail.preset` — новий пресет, сторінка зберігає його на сервері через `PUT /api/presets/me`).
+
+## Панель налаштувань
+
+Кнопка «Settings» на панелі керування (або клавіша `s`) відкриває панель з вкладками: Look (кольори, прозорість, радіус, розмір кнопок, шрифт, використання теми каналу), Controls (конструктор розкладки: склад і порядок кнопок зліва і справа, автоприховування), Playback, Quality (режим ABR, максимальна роздільна здатність, алгоритм), Keys (перепризначення клавіш з перевіркою конфліктів), Preset (експорт / імпорт JSON, скидання). Зміни застосовуються одразу і зберігаються як пресет глядача.
+
+Серверний API (`routes/presets.js`): `GET/PUT/DELETE /api/presets/me` — пресет глядача, `GET /api/presets/channel/:userId`, `PUT/DELETE /api/presets/channel` — тема каналу (лише група `theme`). Усі дані перевіряються `utils/presetValidation.js`.
 
 ## Структура
 

@@ -5,6 +5,7 @@ const User = require('../schemas/userSchema');
 const mongoose = require('mongoose');
 const VideoMeta = require('../schemas/VideoMeta');
 const storage = require('../utils/storage');
+const { loadPreset } = require('./presets');
 const rateLimit = require('express-rate-limit');
 
 const playerRateLimiter = rateLimit({
@@ -67,8 +68,17 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
       .populate('user', 'username avatarUrl') 
       .lean();
  
+    // Player customization: the channel's theme and the signed-in viewer's own settings.
+    const [authorConfig, viewerPreset] = await Promise.all([
+      video.user ? loadPreset(video.user._id, 'author') : null,
+      currentUser ? loadPreset(currentUser._id, 'viewer') : null,
+    ]);
+    const authorTheme = authorConfig && authorConfig.theme ? authorConfig.theme : null;
+
     res.render('player', {
       title: video.title,
+      authorTheme,
+      viewerPreset: currentUser ? viewerPreset || {} : null,
       description: video.description,
       playable,
       processing,
@@ -107,4 +117,4 @@ router.get('/stream/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;

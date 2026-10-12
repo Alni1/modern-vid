@@ -2,251 +2,320 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> | ModernVid</title>
   <link href="/stylesheets/style.css" rel="stylesheet" />
-  <title><%= title %></title>
-  <style>
-    .video-thumbnail-container { position: relative; }
-    .video-status-badge {
-      position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 4px;
-      background: rgba(0,0,0,.75); color: #fff; font-size: 12px;
-    }
-    .video-status-failed { background: rgba(160,40,40,.85); }
-  </style>
+  <link href="/stylesheets/profile.css" rel="stylesheet" />
+  <script type="module" src="/mvplayer/mvplayer.js"></script>
 </head>
-<body style="margin:0;">
-  <%- include('partials/header', { user: typeof user !== 'undefined' ? user : null, query: typeof query !== 'undefined' ? query : '' }) %>
+<%
+  const ct = (typeof channelTheme !== 'undefined' && channelTheme) || {};
+  const pvSrc = typeof previewSrc !== 'undefined' ? previewSrc : null;
+  const pvPoster = typeof previewPoster !== 'undefined' ? previewPoster : null;
+  const videos = Array.isArray(user.videos) ? user.videos : [];
+  const totalViews = videos.reduce((sum, v) => sum + (v.views || 0), 0);
+  const accent = ct.accent || '#ff3d3d';
+  const compact = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n);
+  const duration = (s) => {
+    if (!s) return '';
+    s = Math.round(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+    return h ? h + ':' + String(m).padStart(2, '0') + ':' + sec : m + ':' + sec;
+  };
+  const ago = (d) => {
+    const sec = Math.max(1, Math.round((Date.now() - new Date(d).getTime()) / 1000));
+    const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    for (const [name, size] of units) {
+      const n = Math.floor(sec / size);
+      if (n >= 1) return n + ' ' + name + (n > 1 ? 's' : '') + ' ago';
+    }
+    return 'just now';
+  };
+  const joined = user.timestamp ? new Date(user.timestamp).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : null;
+  const fonts = [
+    ['System', 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'],
+    ['Serif', 'Georgia, "Times New Roman", serif'],
+    ['Monospace', 'ui-monospace, Consolas, "Courier New", monospace'],
+    ['Rounded', '"Trebuchet MS", "Segoe UI", Verdana, sans-serif'],
+  ];
+  const swatches = ['#ff3d3d', '#ff8a00', '#f5c400', '#22c55e', '#00b3ff', '#3d6bff', '#a855f7', '#ec4899'];
+%>
+<body class="pf-body" style="--pf-accent: <%= accent %>;">
+  <%- include('partials/header', { user: user, query: typeof query !== 'undefined' ? query : '' }) %>
 
-  <div class="profile-container" style="margin-top: 95px;"> <%# Added margin-top to account for fixed header %>
-    <div class="profile-header">
-      <div class="profile-avatar-container">
-        <% if (user.avatarUrl) { %>
-          <img src="<%= user.avatarUrl %>" alt="Avatar" class="profile-avatar" />
-        <% } else { %>
-          <div class="profile-avatar-placeholder"></div>
-        <% } %>
-      </div>
-      <div class="profile-info">
-        <h1 class="profile-username"><%= user.username %></h1>
-       
-      </div>
-    </div>
-
-    <div class="profile-actions">
-      <div class="avatar-update-section">
-        <h4 class="form-label">Update Avatar:</h4>
-        <img id="avatarPreview" src="<%= user.avatarUrl || '/images/default-avatar.png' %>" alt="Avatar Preview" class="avatar-preview-img"/>
-        <form action="/userprofile/avatar" method="POST" enctype="multipart/form-data" class="avatar-upload-form">
-          <label for="avatar" class="btn btn-primary btn-file-upload">
-            Choose Image
-            <input type="file" id="avatar" name="avatar" accept="image/*" required style="display: none;"/>
+  <main class="pf">
+    <!-- ============ Channel header ============ -->
+    <section class="pf-hero" aria-label="Channel">
+      <div class="pf-cover" aria-hidden="true"></div>
+      <div class="pf-hero-body">
+        <form action="/userprofile/avatar" method="POST" enctype="multipart/form-data" class="pf-avatar-form" id="avatarForm">
+          <label class="pf-avatar" title="Change profile picture">
+            <% if (user.avatarUrl) { %>
+              <img src="<%= user.avatarUrl %>" alt="" id="avatarImg" />
+            <% } else { %>
+              <span class="pf-avatar-letter" id="avatarImg"><%= (user.username || '?').trim().charAt(0).toUpperCase() %></span>
+            <% } %>
+            <span class="pf-avatar-edit" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            </span>
+            <input type="file" name="avatar" accept="image/*" class="pf-visually-hidden avatar-input" aria-label="Change profile picture" />
           </label>
-          <button type="submit" class="btn btn-success" id="uploadAvatarBtn" style="display:none;">Upload New Avatar</button>
         </form>
-      </div>
-      <button id="openUploadBtn" class="btn btn-secondary">Upload New Video</button>
-    </div>
 
-    <div class="profile-videos-section">
-      <h2>Your Videos</h2>
-      <% if (!user.videos || user.videos.length === 0) { %>
-        <p class="no-videos-message">You have no videos uploaded yet.</p>
+        <div class="pf-identity">
+          <h1 class="pf-name"><%= user.username %></h1>
+          <p class="pf-handle">@<%= user.login %><% if (joined) { %> · Joined <%= joined %><% } %></p>
+          <ul class="pf-stats">
+            <li><strong><%= videos.length %></strong> <%= videos.length === 1 ? 'video' : 'videos' %></li>
+            <li><strong><%= compact(totalViews) %></strong> <%= totalViews === 1 ? 'view' : 'views' %></li>
+          </ul>
+        </div>
+
+        <div class="pf-hero-actions">
+          <button type="button" class="pf-btn pf-btn-primary" data-open-upload>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+            Upload video
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Tabs ============ -->
+    <nav class="pf-tabs" role="tablist" aria-label="Profile sections">
+      <button type="button" role="tab" class="pf-tab" id="tab-videos" aria-controls="panel-videos" data-tab="videos">
+        Videos <span class="pf-count"><%= videos.length %></span>
+      </button>
+      <button type="button" role="tab" class="pf-tab" id="tab-theme" aria-controls="panel-theme" data-tab="theme">Player theme</button>
+      <button type="button" role="tab" class="pf-tab" id="tab-account" aria-controls="panel-account" data-tab="account">Account</button>
+    </nav>
+
+    <!-- ============ Videos ============ -->
+    <section class="pf-panel" role="tabpanel" id="panel-videos" aria-labelledby="tab-videos">
+      <% if (videos.length === 0) { %>
+        <div class="pf-empty">
+          <div class="pf-empty-art" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg>
+          </div>
+          <h2>No videos yet</h2>
+          <p>Upload your first video. It becomes available in a minute and higher qualities follow in the background.</p>
+          <button type="button" class="pf-btn pf-btn-primary" data-open-upload>Upload video</button>
+        </div>
       <% } else { %>
-        <div class="video-grid profile-video-grid">
-          <% user.videos.forEach(video => { %>
-            <div class="video-card">
-              <a href="/player/<%= video._id %>" class="video-card-link">
-                <div class="video-thumbnail-container">
-                  <% if (video.thumbnailUrl) { %>
-                    <img src="<%= video.thumbnailUrl %>" alt="<%= video.title %> thumbnail" class="video-thumbnail" />
-                  <% } else { %>
-                    <div class="video-thumbnail"></div>
-                  <% } %>
-                  <% if (video.status === 'processing') { %>
-                    <span class="video-status-badge">Processing <%= Math.round((video.processingProgress || 0) * 100) %>%</span>
-                  <% } else if (video.status === 'ready' && video.hls && video.hls.masterKey && video.processingProgress < 1) { %>
-                    <span class="video-status-badge">HD processing <%= Math.round(video.processingProgress * 100) %>%</span>
-                  <% } else if (video.status === 'failed') { %>
-                    <span class="video-status-badge video-status-failed" title="<%= video.processingError || '' %>">Original quality only</span>
-                  <% } %>
-                </div>
-                <div class="video-info">
-                  <h3 class="video-title"><%= video.title %></h3>
-                  <div class="video-meta">
-                    <span class="video-views"><%= video.views %> views</span>
-                    <span class="video-date"><%= new Date(video.uploadedAt).toLocaleDateString() %></span>
-                  </div>
-                </div>
+        <div class="pf-toolbar">
+          <label class="pf-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+            <input type="search" id="videoFilter" placeholder="Find a video" aria-label="Find a video" />
+          </label>
+          <label class="pf-select">
+            <span class="pf-visually-hidden">Sort videos</span>
+            <select id="videoSort">
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="views">Most viewed</option>
+            </select>
+          </label>
+        </div>
+
+        <ul class="pf-grid" id="videoGrid">
+          <% videos.slice().reverse().forEach(function (video) { %>
+            <li class="pf-card" data-title="<%= (video.title || '').toLowerCase() %>"
+                data-date="<%= new Date(video.uploadedAt).getTime() %>" data-views="<%= video.views || 0 %>">
+              <a href="/player/<%= video._id %>" class="pf-thumb">
+                <% if (video.thumbnailUrl) { %>
+                  <img src="<%= video.thumbnailUrl %>" alt="" loading="lazy" />
+                <% } else { %>
+                  <span class="pf-thumb-empty"></span>
+                <% } %>
+                <% if (video.status === 'processing') { %>
+                  <span class="pf-badge pf-badge-work">Processing <%= Math.round((video.processingProgress || 0) * 100) %>%</span>
+                <% } else if (video.status === 'ready' && video.hls && video.hls.masterKey && video.processingProgress < 1) { %>
+                  <span class="pf-badge pf-badge-work">HD in progress <%= Math.round(video.processingProgress * 100) %>%</span>
+                <% } else if (video.status === 'failed') { %>
+                  <span class="pf-badge pf-badge-warn" title="<%= video.processingError || '' %>">Original quality only</span>
+                <% } %>
+                <% if (duration(video.duration)) { %><span class="pf-duration"><%= duration(video.duration) %></span><% } %>
               </a>
-              <div class="video-actions">
-                <form method="POST" action="/userprofile/video/delete/<%= video._id %>" onsubmit="return confirm('Are you sure you want to delete this video?');">
-                  <button type="submit" class="btn btn-danger btn-small">Delete Video</button>
+              <div class="pf-card-body">
+                <a href="/player/<%= video._id %>" class="pf-card-title" title="<%= video.title %>"><%= video.title || 'Untitled' %></a>
+                <p class="pf-card-meta"><%= compact(video.views || 0) %> views · <%= ago(video.uploadedAt) %></p>
+              </div>
+              <div class="pf-card-actions">
+                <button type="button" class="pf-icon-btn" data-copy="/player/<%= video._id %>" title="Copy link" aria-label="Copy link to <%= video.title %>">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+                </button>
+                <form method="POST" action="/userprofile/video/delete/<%= video._id %>" data-confirm="Delete “<%= video.title %>”? This cannot be undone.">
+                  <button type="submit" class="pf-icon-btn pf-icon-danger" title="Delete video" aria-label="Delete <%= video.title %>">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>
+                  </button>
                 </form>
               </div>
-            </div>
+            </li>
           <% }); %>
-        </div>
+        </ul>
+        <p class="pf-no-match" id="noMatch" hidden>No videos match your search.</p>
       <% } %>
-    </div>
+    </section>
 
-    <div class="profile-danger-zone">
-      <h3>Account Settings</h3>
-      <form method="POST" action="/userprofile/deleteUser" onsubmit="return confirm('Are you sure you want to delete your account? This action is irreversible and will remove all your data.');">
-        <button type="submit" class="btn btn-danger">Delete My Account</button>
-      </form>
-    </div>
-  </div>
+    <!-- ============ Player theme ============ -->
+    <section class="pf-panel" role="tabpanel" id="panel-theme" aria-labelledby="tab-theme" hidden>
+      <div class="pf-theme">
+        <form id="channelThemeForm" class="pf-card-box pf-theme-form">
+          <h2>Player theme for your channel</h2>
+          <p class="pf-muted">Viewers see this look on your videos. Anyone can still switch to their own look in the player settings.</p>
 
- 
-  <div id="uploadModal" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-    background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
-    <div style="background: white; padding: 2em; border-radius: 15px; width: 400px; max-width: 90%; position: relative;">
-      <h2 style="margin-top: 0;">Upload Video</h2>
-      <form id="videoUploadForm" action="/upload" method="POST" enctype="multipart/form-data">
-        <div style="margin-bottom: 15px;">
-          <label for="modalTitle" style="display: block; margin-bottom: 5px; font-weight: bold;">Title</label>
-          <input type="text" id="modalTitle" name="title" placeholder="Video title" required style="width: 100%; padding: 8px; box-sizing: border-box;" />
+          <fieldset class="pf-field">
+            <legend>Accent color</legend>
+            <div class="pf-swatches">
+              <% swatches.forEach(function (c) { %>
+                <button type="button" class="pf-swatch" style="background: <%= c %>" data-swatch="<%= c %>" data-target="accent" aria-label="Accent <%= c %>"></button>
+              <% }) %>
+              <input type="color" name="accent" value="<%= ct.accent || '#ff3d3d' %>" aria-label="Custom accent color" />
+            </div>
+          </fieldset>
+
+          <div class="pf-field-row">
+            <label class="pf-field">
+              <span>Panel color</span>
+              <input type="color" name="background" value="<%= ct.background || '#000000' %>" />
+            </label>
+            <label class="pf-field">
+              <span>Text and icons</span>
+              <input type="color" name="foreground" value="<%= ct.foreground || '#ffffff' %>" />
+            </label>
+          </div>
+
+          <label class="pf-field">
+            <span>Panel opacity <output data-for="panelOpacity"></output></span>
+            <input type="range" name="panelOpacity" min="0" max="1" step="0.05" value="<%= ct.panelOpacity ?? 0.6 %>" />
+          </label>
+          <label class="pf-field">
+            <span>Corner radius <output data-for="radius"></output></span>
+            <input type="range" name="radius" min="0" max="16" step="1" value="<%= ct.radius ?? 6 %>" />
+          </label>
+
+          <fieldset class="pf-field">
+            <legend>Button size</legend>
+            <div class="pf-segmented">
+              <% [['compact', 'Compact'], ['normal', 'Normal'], ['large', 'Large']].forEach(function (o) { %>
+                <label><input type="radio" name="controlSize" value="<%= o[0] %>" <%= (ct.controlSize || 'normal') === o[0] ? 'checked' : '' %> /><span><%= o[1] %></span></label>
+              <% }) %>
+            </div>
+          </fieldset>
+
+          <label class="pf-field">
+            <span>Font</span>
+            <span class="pf-select">
+              <select name="fontFamily">
+                <% fonts.forEach(function (f) { %>
+                  <option value="<%= f[1] %>" <%= (ct.fontFamily || fonts[0][1]) === f[1] ? 'selected' : '' %>><%= f[0] %></option>
+                <% }) %>
+              </select>
+            </span>
+          </label>
+
+          <div class="pf-form-actions">
+            <button type="submit" class="pf-btn pf-btn-primary">Save theme</button>
+            <button type="button" class="pf-btn pf-btn-ghost" id="channelThemeReset">Reset to default</button>
+            <span class="pf-status" id="channelThemeStatus" role="status"></span>
+          </div>
+        </form>
+
+        <div class="pf-card-box pf-preview">
+          <div class="pf-preview-head">
+            <h2>Preview</h2>
+            <span class="pf-muted">Try the controls — nothing here changes your own settings.</span>
+          </div>
+          <mv-player id="themePreview" preview
+                     <% if (pvSrc) { %>src="<%= pvSrc %>"<% } %>
+                     <% if (pvPoster) { %>poster="<%= pvPoster %>"<% } %>
+                     author-theme="<%= JSON.stringify(ct) %>"></mv-player>
+          <% if (!pvSrc) { %><p class="pf-muted pf-preview-note">Upload a video to preview the theme with real playback.</p><% } %>
         </div>
-        
-        <div style="margin-bottom: 15px;">
-          <label for="modalDescription" style="display: block; margin-bottom: 5px; font-weight: bold;">Description</label>
-          <input type="text" id="modalDescription" name="description" placeholder="Description (optional)" style="width: 100%; padding: 8px; box-sizing: border-box;" />
+      </div>
+    </section>
+
+    <!-- ============ Account ============ -->
+    <section class="pf-panel" role="tabpanel" id="panel-account" aria-labelledby="tab-account" hidden>
+      <div class="pf-account">
+        <div class="pf-card-box">
+          <h2>Profile</h2>
+          <dl class="pf-details">
+            <div><dt>Display name</dt><dd><%= user.username %></dd></div>
+            <div><dt>Login</dt><dd><%= user.login %></dd></div>
+            <% if (joined) { %><div><dt>Member since</dt><dd><%= joined %></dd></div><% } %>
+          </dl>
+          <form action="/userprofile/avatar" method="POST" enctype="multipart/form-data" class="pf-avatar-row">
+            <% if (user.avatarUrl) { %>
+              <img src="<%= user.avatarUrl %>" alt="" class="pf-avatar-small" />
+            <% } else { %>
+              <span class="pf-avatar-small pf-avatar-letter"><%= (user.username || '?').trim().charAt(0).toUpperCase() %></span>
+            <% } %>
+            <label class="pf-btn pf-btn-ghost">
+              Change profile picture
+              <input type="file" name="avatar" accept="image/*" class="pf-visually-hidden avatar-input" />
+            </label>
+          </form>
         </div>
-        
-        <div style="margin-bottom: 15px;">
-          <label for="modalVideoFile" style="display: block; margin-bottom: 5px; font-weight: bold;">Select video file</label>
-          <input type="file" id="modalVideoFile" name="video" accept="video/*" required style="width: 100%;" />
+
+        <div class="pf-card-box pf-danger">
+          <h2>Delete account</h2>
+          <p class="pf-muted">Your videos, comments and player settings are removed for good.</p>
+          <form method="POST" action="/userprofile/deleteUser" data-confirm="Delete your account and all your videos? This cannot be undone.">
+            <button type="submit" class="pf-btn pf-btn-danger">Delete my account</button>
+          </form>
         </div>
+      </div>
+    </section>
+  </main>
 
-        <div style="margin-bottom: 15px;">
-          <label for="modalCategory" style="display: block; margin-bottom: 5px; font-weight: bold;">Category</label>
-          <select id="modalCategory" name="category" required style="width: 100%; padding: 8px; box-sizing: border-box;">
-            <option value="Education">Education</option>
-            <option value="Entertainment">Entertainment</option>
-          </select>
+  <!-- ============ Upload dialog ============ -->
+  <dialog class="pf-dialog" id="uploadDialog" aria-labelledby="uploadTitle">
+    <form id="videoUploadForm" method="dialog" class="pf-upload">
+      <div class="pf-dialog-head">
+        <h2 id="uploadTitle">Upload video</h2>
+        <button type="button" class="pf-icon-btn" data-close-upload aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <label class="pf-drop" id="dropZone">
+        <input type="file" id="modalVideoFile" name="video" accept="video/*" required class="pf-visually-hidden" />
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
+        <strong id="dropText">Drop a video here or click to choose</strong>
+        <span class="pf-muted" id="dropHint">MP4, WebM, MOV… up to 1 GB</span>
+      </label>
+
+      <label class="pf-field">
+        <span>Title</span>
+        <input type="text" id="modalTitle" name="title" required maxlength="120" placeholder="Give your video a title" />
+      </label>
+      <label class="pf-field">
+        <span>Description <em class="pf-muted">optional</em></span>
+        <textarea id="modalDescription" name="description" rows="3" maxlength="2000" placeholder="Tell viewers about your video"></textarea>
+      </label>
+      <fieldset class="pf-field">
+        <legend>Category</legend>
+        <div class="pf-segmented">
+          <label><input type="radio" name="category" value="Education" checked /><span>Education</span></label>
+          <label><input type="radio" name="category" value="Entertainment" /><span>Entertainment</span></label>
         </div>
+      </fieldset>
 
-        <div id="uploadProgressContainer" style="margin-bottom: 15px; display: none;">
-          <div id="uploadProgressBar" style="width: 0%; height: 20px; background-color: #4CAF50; text-align: center; line-height: 20px; color: white; border-radius: 5px;">0%</div>
-        </div>
-        <div id="uploadStatus" style="margin-bottom: 15px; font-size: 0.9em;"></div>
+      <div class="pf-progress" id="uploadProgress" hidden>
+        <div class="pf-progress-bar"><span id="uploadProgressBar"></span></div>
+        <span id="uploadPercent">0%</span>
+      </div>
+      <p class="pf-status" id="uploadStatus" role="status"></p>
 
+      <div class="pf-form-actions pf-dialog-actions">
+        <button type="button" class="pf-btn pf-btn-ghost" data-close-upload>Cancel</button>
+        <button type="submit" class="pf-btn pf-btn-primary" id="submitUploadBtn">Upload</button>
+      </div>
+    </form>
+  </dialog>
 
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" id="closeUploadBtn" style="padding: 10px 20px; border-radius: 4px; cursor: pointer; background: #eee; border: none;">Cancel</button>
-          <button type="submit" id="submitUploadBtn" class="registerbtn" style="width: auto;">Upload</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <div class="pf-toast" id="toast" role="status" hidden></div>
 
-  <script>
-    const openBtn = document.getElementById('openUploadBtn');
-    const modal = document.getElementById('uploadModal');
-    const closeBtn = document.getElementById('closeUploadBtn');
-    const uploadForm = document.getElementById('videoUploadForm');
-    const submitUploadBtn = document.getElementById('submitUploadBtn');
-    const progressBar = document.getElementById('uploadProgressBar');
-    const progressContainer = document.getElementById('uploadProgressContainer');
-    const uploadStatus = document.getElementById('uploadStatus');
-    const videoFileInput = document.getElementById('modalVideoFile');
-
-    openBtn.addEventListener('click', () => {
-      modal.style.display = 'flex';
-      // Reset form and progress on open
-      uploadForm.reset();
-      progressContainer.style.display = 'none';
-      progressBar.style.width = '0%';
-      progressBar.textContent = '0%';
-      uploadStatus.textContent = '';
-      submitUploadBtn.disabled = false;
-    });
-
-    closeBtn.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-
-    window.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        modal.style.display = 'none';
-      }
-    });
-
-    uploadForm.addEventListener('submit', function(event) {
-      event.preventDefault();
-      submitUploadBtn.disabled = true;
-      uploadStatus.textContent = 'Starting upload...';
-
-      const formData = new FormData(this);
-      const xhr = new XMLHttpRequest();
-
-      xhr.open('POST', '/upload', true);
-
-      xhr.upload.onprogress = function(e) {
-        if (e.lengthComputable) {
-          const percentComplete = (e.loaded / e.total) * 100;
-          progressContainer.style.display = 'block';
-          progressBar.style.width = percentComplete.toFixed(2) + '%';
-          progressBar.textContent = percentComplete.toFixed(2) + '%';
-          uploadStatus.textContent = 'Uploading to server... ' + percentComplete.toFixed(2) + '%';
-        }
-      };
-
-      xhr.onload = function() {
-        submitUploadBtn.disabled = false;
-        if (xhr.status === 201) {
-          uploadStatus.textContent = 'Upload successful! Processing on server...';
-          // Optionally, close modal and refresh part of the page or redirect
-          // For now, just give a success message.
-          // You might want to redirect to userprofile or refresh videos list
-          setTimeout(() => {
-            modal.style.display = 'none';
-            window.location.reload(); // Simple reload for now
-          }, 2000);
-        } else {
-          progressContainer.style.display = 'none';
-          try {
-            const response = JSON.parse(xhr.responseText);
-            uploadStatus.textContent = 'Upload failed: ' + (response.error || xhr.statusText);
-          } catch (parseError) {
-            uploadStatus.textContent = 'Upload failed: ' + xhr.statusText;
-          }
-        }
-      };
-
-      xhr.onerror = function() {
-        submitUploadBtn.disabled = false;
-        progressContainer.style.display = 'none';
-        uploadStatus.textContent = 'Upload failed. Network error.';
-      };
-      
-      xhr.send(formData);
-    });
-
-    // Avatar Preview Script
-    const avatarInput = document.getElementById('avatar');
-    const avatarPreview = document.getElementById('avatarPreview');
-    const uploadAvatarBtn = document.getElementById('uploadAvatarBtn');
-    const defaultAvatarSrc = '<%= user.avatarUrl || "/images/default-avatar.png" %>'; // Store initial/default src
-
-    if (avatarInput && avatarPreview && uploadAvatarBtn) {
-      avatarInput.addEventListener('change', function(event) {
-        const file = event.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            avatarPreview.src = e.target.result;
-          }
-          reader.readAsDataURL(file);
-          uploadAvatarBtn.style.display = 'inline-block'; // Show upload button
-        } else {
-          // If no file is selected (e.g., user cancels dialog), revert to original or default
-          avatarPreview.src = defaultAvatarSrc;
-          uploadAvatarBtn.style.display = 'none';
-        }
-      });
-    }
-  </script>
+  <script src="/javascripts/profile.js" defer></script>
 </body>
-</html>
+</html>

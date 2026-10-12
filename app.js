@@ -25,6 +25,7 @@ const uploadRouter = require('./routes/upload');
 const searchRouter = require('./routes/search');
 const userProfileRouter = require('./routes/userprofile');
 const commentRouter = require('./routes/comment'); 
+const presetsRouter = require('./routes/presets');
 
 
 var usersRouter = require('./routes/users');
@@ -62,6 +63,7 @@ app.use('/upload', uploadRouter);   // ← added
 app.use('/search', searchRouter);
 app.use('/userprofile', userProfileRouter); // user profile route
 app.use('/comments', commentRouter); // Use comment router
+app.use('/api/presets', presetsRouter); // player settings: viewer presets and channel themes
 app.use('/logout', logoutRouter);
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

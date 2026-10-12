@@ -6,6 +6,8 @@ import { formatRate, formatTime } from './format';
 export interface ControlContext {
   core: PlayerCore;
   config: PlayerConfig;
+  /** Player-level UI actions available to controls. */
+  ui?: { toggleSettings(): void; settingsOpen(): boolean };
 }
 
 export interface Control {
@@ -258,6 +260,20 @@ const fullscreen: ControlFactory = ({ core }) => {
   };
 };
 
+const settings: ControlFactory = ({ ui }) => {
+  const el = button('mv-settings-btn', 'Player settings', icons.settings);
+  el.setAttribute('aria-haspopup', 'dialog');
+  el.addEventListener('click', () => ui?.toggleSettings());
+  return {
+    el,
+    update: () => {
+      const open = ui?.settingsOpen() ?? false;
+      el.classList.toggle('mv-active', open);
+      el.setAttribute('aria-expanded', String(open));
+    },
+  };
+};
+
 /** Registry of all controls available to the layout. Plugins can add more. */
 export const controlRegistry = new Map<ControlId | string, ControlFactory>([
   ['play', play],
@@ -268,6 +284,7 @@ export const controlRegistry = new Map<ControlId | string, ControlFactory>([
   ['spacer', spacer],
   ['speed', speed],
   ['quality', quality],
+  ['settings', settings],
   ['pip', pip],
   ['fullscreen', fullscreen],
 ]);

@@ -30,7 +30,7 @@ export function deepMerge<T>(base: T, patch: unknown): T {
  * system defaults -> channel author -> viewer.
  * The author may only change appearance (theme); behaviour, layout, hotkeys and
  * accessibility always belong to the viewer. A viewer can opt out of the
- * author's branding with `ignoreAuthorTheme`.
+ * author's branding (behavior.useAuthorTheme = false or `ignoreAuthorTheme`).
  */
 export function resolveConfig(
   author: AuthorPreset | null | undefined,
@@ -38,7 +38,8 @@ export function resolveConfig(
   options: { ignoreAuthorTheme?: boolean } = {},
 ): PlayerConfig {
   let cfg = deepMerge(DEFAULT_CONFIG, {});
-  if (author?.theme && !options.ignoreAuthorTheme) {
+  const optedOut = options.ignoreAuthorTheme || viewer?.behavior?.useAuthorTheme === false;
+  if (author?.theme && !optedOut) {
     cfg = deepMerge(cfg, { theme: author.theme });
   }
   if (viewer) cfg = deepMerge(cfg, viewer);

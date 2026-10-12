@@ -158,7 +158,7 @@ export class AdaptiveHybridRule implements AbrAlgorithm {
 
     // 3. Down-switch guard: would the next segment at the current level drain the buffer?
     const downloadTime = (levels[current].bitrate * d) / C;
-    if (B - downloadTime < p.reserve || current > top) {
+    if (B - downloadTime < p.reserve) {
       let safe = 0;
       for (let i = 0; i <= top; i++) if (B - (levels[i].bitrate * d) / C >= p.reserve) safe = i;
       return Math.min(safe, candidate, current);

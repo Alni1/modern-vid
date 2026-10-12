@@ -9,6 +9,7 @@ export type ControlId =
   | 'speed'
   | 'quality'
   | 'pip'
+  | 'settings'
   | 'fullscreen';
 
 export type ControlSize = 'compact' | 'normal' | 'large';
@@ -46,6 +47,8 @@ export interface BehaviorConfig {
   seekStep: number;
   /** Speeds offered in the speed menu. */
   speeds: number[];
+  /** Apply the channel author's theme (false = always use the viewer's own appearance). */
+  useAuthorTheme: boolean;
 }
 
 export type AbrAlgorithmName = 'adaptive' | 'hybrid' | 'throughput' | 'buffer';
@@ -72,7 +75,8 @@ export type HotkeyAction =
   | 'toggleFullscreen'
   | 'speedUp'
   | 'speedDown'
-  | 'toggleStats';
+  | 'toggleStats'
+  | 'toggleSettings';
 
 /** action -> list of KeyboardEvent.key values (case-insensitive). */
 export type HotkeysConfig = Record<HotkeyAction, string[]>;
