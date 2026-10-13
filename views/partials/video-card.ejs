@@ -1,0 +1,40 @@
+<%
+  const vcCompact = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K' : String(n || 0);
+  const vcDuration = (s) => {
+    if (!s) return '';
+    s = Math.round(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+    return h ? h + ':' + String(m).padStart(2, '0') + ':' + sec : m + ':' + sec;
+  };
+  const vcAgo = (d) => {
+    if (!d) return '';
+    const sec = Math.max(1, Math.round((Date.now() - new Date(d).getTime()) / 1000));
+    const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+    for (const [name, size] of units) {
+      const n = Math.floor(sec / size);
+      if (n >= 1) return n + ' ' + name + (n > 1 ? 's' : '') + ' ago';
+    }
+    return 'just now';
+  };
+  const vcAuthor = video.user && video.user.username ? video.user.username : 'Unknown';
+%>
+<article class="vcard">
+  <a href="/player/<%= video._id %>" class="vcard-thumb" tabindex="-1" aria-hidden="true">
+    <% if (video.thumbnailUrl) { %>
+      <img src="<%= video.thumbnailUrl %>" alt="" loading="lazy" />
+    <% } else { %>
+      <span class="vcard-thumb-empty"></span>
+    <% } %>
+    <% if (vcDuration(video.duration)) { %><span class="vcard-duration"><%= vcDuration(video.duration) %></span><% } %>
+  </a>
+  <div class="vcard-body">
+    <span class="vcard-avatar" aria-hidden="true">
+      <% if (video.user && video.user.avatarUrl) { %><img src="<%= video.user.avatarUrl %>" alt="" loading="lazy" /><% } else { %><%= vcAuthor.trim().charAt(0).toUpperCase() %><% } %>
+    </span>
+    <div class="vcard-text">
+      <h3 class="vcard-title"><a href="/player/<%= video._id %>" title="<%= video.title %>"><%= video.title || 'Untitled' %></a></h3>
+      <p class="vcard-author"><%= vcAuthor %></p>
+      <p class="vcard-meta"><%= vcCompact(video.views) %> views · <%= vcAgo(video.uploadedAt) %></p>
+    </div>
+  </div>
+</article>

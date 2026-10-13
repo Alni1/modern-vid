@@ -128,6 +128,19 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
   background: rgba(var(--mv-panel-rgb), .85); font-size: .9em; white-space: nowrap; pointer-events: none;
 }
 
+.mv-preview {
+  position: absolute; bottom: 22px; transform: translateX(-50%); pointer-events: none; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.mv-preview-frame {
+  width: 100%; overflow: hidden; background: #000; border-radius: max(4px, calc(var(--mv-radius) * .8));
+  border: 2px solid rgba(var(--mv-fg-rgb), .9); box-shadow: 0 6px 20px rgba(0,0,0,.5);
+}
+.mv-preview-img { transform-origin: 0 0; background-repeat: no-repeat; }
+.mv-preview-time {
+  padding: 2px 8px; border-radius: 4px; background: rgba(var(--mv-panel-rgb), .85); font-size: .9em;
+  font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
 .mv-menu-wrap { position: relative; }
 .mv-menu {
   position: absolute; right: 0; bottom: calc(100% + 6px); min-width: 7.5em; padding: 4px;
@@ -152,6 +165,18 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 .mv-stats-close {
   position: absolute; top: 2px; right: 4px; border: 0; background: none; color: inherit;
   font-size: 16px; cursor: pointer; line-height: 1;
+}
+
+/* Narrow players (phones): smaller buttons; rewind/forward buttons hidden (the arrow keys still work). */
+@container (max-width: 520px) {
+  .mv-bar { --mv-size: 36px; gap: 0; }
+  .mv-controls { padding: 18px 4px 2px; }
+  .mv-bar [data-control="rewind"], .mv-bar [data-control="forward"], .mv-bar [data-control="spacer"] { display: none; }
+  .mv-time { padding: 0 .3em; font-size: 12px; }
+  .mv-text-btn { padding: 0 .35em; min-width: 30px; }
+}
+@container (max-width: 360px) {
+  .mv-bar [data-control="pip"] { display: none; }
 }
 
 /* ---------------- settings panel ---------------- */
@@ -187,7 +212,7 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 .mv-s-tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px; padding: 0 2px; }
 .mv-s-tabs::-webkit-scrollbar { display: none; }
 .mv-s-tab {
-  flex: none; border: 0; background: none; color: var(--s-muted); font: inherit; font-weight: 600;
+  flex: none; border: 0; background: none; color: var(--s-muted); font: inherit; font-size: 12.5px; font-weight: 600;
   padding: 7px 8px 9px; cursor: pointer; position: relative; border-radius: var(--s-r) var(--s-r) 0 0;
 }
 .mv-s-tab:hover { color: var(--mv-fg); background: var(--s-surface); }
@@ -200,6 +225,8 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 .mv-s-row { display: flex; align-items: center; gap: 10px; min-height: 40px; border-bottom: 1px solid var(--s-line); }
 .mv-s-row:last-child { border-bottom: 0; }
 .mv-s-label { flex: 1; min-width: 0; }
+.mv-s-locked { opacity: .45; }
+.mv-s-locked * { cursor: not-allowed !important; }
 .mv-s-sub { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--s-muted); margin: 12px 0 6px; }
 .mv-s-hint { margin: 8px 0; color: var(--s-muted); font-size: 12px; }
 .mv-s-warn { margin: 8px 0 0; padding: 6px 8px; border-radius: var(--s-r); background: rgba(255,176,32,.14); color: #ffb020; font-size: 12px; }

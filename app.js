@@ -31,7 +31,6 @@ const presetsRouter = require('./routes/presets');
 var usersRouter = require('./routes/users');
 var registrationRouter = require('./routes/registration');
 var loginRouter = require('./routes/login');
-const { validateHeaderName } = require('http');
 
 mongoose.connect(process.env.MONGODB_URL)
 .then(() => {

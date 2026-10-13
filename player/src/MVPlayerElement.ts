@@ -48,6 +48,7 @@ function parseJson<T>(value: string | null): T | null {
  *  - author-theme  JSON with the channel author's theme (appearance only)
  *  - preset        JSON with the viewer's saved preset (from the server);
  *                  when absent or empty the preset stored in the browser is used
+ *  - thumbnails    URL of a WebVTT track with seek-bar preview frames (sprite sheets)
  *  - preview       boolean: preview mode (e.g. the channel theme editor) — the viewer's
  *                  stored settings are neither applied nor changed
  *
@@ -57,7 +58,7 @@ function parseJson<T>(value: string | null): T | null {
  *                      (the page can save it on the server)
  */
 export class MVPlayerElement extends HTMLElement {
-  static observedAttributes = ['src', 'fallback-src', 'poster', 'author-theme', 'preset'];
+  static observedAttributes = ['src', 'fallback-src', 'poster', 'author-theme', 'preset', 'thumbnails'];
 
   private shadow: ShadowRoot;
   private video!: HTMLVideoElement;
@@ -114,6 +115,7 @@ export class MVPlayerElement extends HTMLElement {
     if (!this.built || oldValue === value) return;
     if (name === 'src' && value) void this.loadSource(value);
     if (name === 'poster') this.video.poster = value ?? '';
+    if (name === 'thumbnails') this.progress?.setThumbnails(value);
     if (name === 'preset') {
       const p = parseJson<ViewerPreset>(value);
       if (p && Object.keys(p).length) this.setViewerPreset(p);
@@ -249,6 +251,7 @@ export class MVPlayerElement extends HTMLElement {
     });
     this.progress = new ProgressBar(core);
     this.els.progressSlot.append(this.progress.el);
+    this.progress.setThumbnails(this.getAttribute('thumbnails'));
 
     // A preset from the server (signed-in viewer) wins; otherwise the one saved in this browser.
     const serverPreset = parseJson<ViewerPreset>(this.getAttribute('preset'));

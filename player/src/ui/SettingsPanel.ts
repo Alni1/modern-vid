@@ -185,10 +185,17 @@ export class SettingsPanel {
   private appearanceTab(): HTMLElement[] {
     const t = this.host.config().theme;
     const out: HTMLElement[] = [];
+    const channelLook = this.host.hasAuthorTheme() && this.host.config().behavior.useAuthorTheme;
     if (this.host.hasAuthorTheme()) {
-      out.push(this.switchRow('Use the channel\'s theme', ['behavior', 'useAuthorTheme'], this.host.config().behavior.useAuthorTheme));
+      const sw = this.switchRow('Use the channel\'s theme', ['behavior', 'useAuthorTheme'], this.host.config().behavior.useAuthorTheme);
+      sw.querySelector('input')?.addEventListener('change', () => this.render());
+      out.push(sw);
+      out.push(el('p', 'mv-s-hint', channelLook
+        ? 'This channel has its own look. Turn the switch off to use your colors here; they are always used on other channels.'
+        : 'Your own look is used on this channel.'));
     }
-    out.push(
+    const fields: HTMLElement[] = [];
+    fields.push(
       this.color('Accent', ['theme', 'accent'], t.accent, SWATCHES),
       this.color('Panel', ['theme', 'background'], t.background, ['#000000', '#1b1f2a', '#0b2540', '#2b1035', '#ffffff']),
       this.color('Text and icons', ['theme', 'foreground'], t.foreground, ['#ffffff', '#e8e8e8', '#ffd84d', '#000000']),
@@ -198,6 +205,15 @@ export class SettingsPanel {
       this.select('Font', ['theme', 'fontFamily'], t.fontFamily,
         Object.entries(FONT_STACKS).map(([name, stack]) => [stack, name] as [string, string]), true),
     );
+    // While the channel's look is active only the button size (accessibility) can be changed here.
+    if (channelLook) {
+      fields.forEach((f) => {
+        if (f.querySelector('#' + CSS.escape(this.fieldId(['theme', 'controlSize'])))) return;
+        f.classList.add('mv-s-locked');
+        f.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>('input, select, button').forEach((x) => (x.disabled = true));
+      });
+    }
+    out.push(...fields);
     return out;
   }
 

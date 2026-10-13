@@ -1,0 +1,15 @@
+<%# Common <head> part: site styles and the theme, applied before the first paint (no flash). %>
+<script>
+  (function () {
+    try {
+      var mode = localStorage.getItem('mv-site-theme') || 'system';
+      var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      var accent = localStorage.getItem('mv-site-accent');
+      if (accent && /^#[0-9a-f]{6}$/i.test(accent)) document.documentElement.style.setProperty('--site-accent', accent);
+    } catch (e) { /* storage blocked: default light theme */ }
+  })();
+</script>
+<link href="/stylesheets/style.css" rel="stylesheet" />
+<link href="/stylesheets/site.css" rel="stylesheet" />
+<script src="/javascripts/site.js" defer></script>

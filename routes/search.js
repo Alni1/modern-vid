@@ -24,7 +24,10 @@ router.get('/', optionalVerifyToken, async (req, res) => {
   }
 
 
-  const videos = await VideoMeta.find(searchConditions);
+  const videos = await VideoMeta.find(searchConditions)
+    .sort({ uploadedAt: -1 })
+    .populate('user', 'username avatarUrl')
+    .lean();
 
   res.render('search-results', {
     videos,

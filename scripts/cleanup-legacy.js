@@ -1,8 +1,10 @@
 /**
  * Removes videos of the first platform version whose files were stored in
  * Firebase Storage (no longer accessible): their records, comments and references.
- *   npm run cleanup-legacy          — only lists what would be deleted
- *   npm run cleanup-legacy -- --yes — deletes
+ *   npm run cleanup-legacy       — only lists what would be deleted
+ *   npm run cleanup-legacy yes   — deletes
+ * (`-- --yes` also works in cmd/bash; PowerShell drops the `--`, then npm itself takes
+ * `--yes` and exposes it as npm_config_yes, which is accepted too.)
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -10,6 +12,8 @@ const VideoMeta = require('../schemas/VideoMeta');
 const User = require('../schemas/userSchema');
 const Comment = require('../schemas/CommentSchema');
 const TranscodeJob = require('../schemas/TranscodeJob');
+
+const confirmed = process.argv.includes('--yes') || process.argv.includes('yes') || process.env.npm_config_yes === 'true';
 
 (async () => {
   await mongoose.connect(process.env.MONGODB_URL);
@@ -19,7 +23,7 @@ const TranscodeJob = require('../schemas/TranscodeJob');
   legacy.forEach((v) => console.log(`${v._id}  ${v.uploadedAt ? v.uploadedAt.toISOString().slice(0, 10) : ''}  ${v.title || ''}`));
   console.log(`${legacy.length} legacy video(s) found`);
 
-  if (legacy.length && process.argv.includes('--yes')) {
+  if (legacy.length && confirmed) {
     const ids = legacy.map((v) => v._id);
     const comments = await Comment.find({ video: { $in: ids } }).select('_id').lean();
     const commentIds = comments.map((c) => c._id);
@@ -29,7 +33,7 @@ const TranscodeJob = require('../schemas/TranscodeJob');
     const res = await VideoMeta.deleteMany({ _id: { $in: ids } });
     console.log(`deleted ${res.deletedCount} video(s) and ${commentIds.length} comment(s)`);
   } else if (legacy.length) {
-    console.log('Nothing deleted. Run `npm run cleanup-legacy -- --yes` to delete them.');
+    console.log('Nothing deleted. Run `npm run cleanup-legacy yes` to delete them.');
   }
   await mongoose.disconnect();
 })().catch((err) => {

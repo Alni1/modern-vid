@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><%= title %> | ModernVid</title>
-  <link href="/stylesheets/style.css" rel="stylesheet" />
+  <%- include('partials/head') %>
   <link href="/stylesheets/profile.css" rel="stylesheet" />
   <script type="module" src="/mvplayer/mvplayer.js"></script>
 </head>
@@ -254,6 +254,14 @@
               Change profile picture
               <input type="file" name="avatar" accept="image/*" class="pf-visually-hidden avatar-input" />
             </label>
+          </form>
+        </div>
+
+        <div class="pf-card-box">
+          <h2>Session</h2>
+          <p class="pf-muted">Sign out of ModernVid on this device.</p>
+          <form method="POST" action="/logout" class="pf-form-actions" style="margin-top: 12px;">
+            <button type="submit" class="pf-btn pf-btn-ghost">Sign out</button>
           </form>
         </div>
 

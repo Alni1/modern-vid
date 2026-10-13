@@ -36,8 +36,16 @@
       showTab(next.dataset.tab, true);
     });
   });
-  showTab(location.hash.slice(1) || 'videos');
-  window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+  const wantsUpload = location.hash === '#upload'; // header "Upload" button
+  showTab(wantsUpload ? 'videos' : location.hash.slice(1) || 'videos');
+  window.addEventListener('hashchange', () => {
+    if (location.hash === '#upload') {
+      showTab('videos');
+      $('[data-open-upload]').click();
+      return;
+    }
+    showTab(location.hash.slice(1));
+  });
 
   // ---------------------------------------------------------------- confirmations
   $$('form[data-confirm]').forEach((form) =>
@@ -271,4 +279,6 @@
     };
     xhr.send(new FormData(form));
   });
+
+  if (wantsUpload) $('[data-open-upload]').click();
 })();

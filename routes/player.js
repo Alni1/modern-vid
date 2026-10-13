@@ -60,11 +60,13 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     // Adaptive HLS stream when transcoding is finished; the original file is the fallback.
     const hlsUrl = video.status === 'ready' && video.hls && video.hls.masterKey ? storage.getUrl(video.hls.masterKey) : null;
     const progressiveUrl = `/player/stream/${video._id}`;
+    // Seek-bar preview frames (WebVTT + sprite sheets), produced together with the first quality.
+    const thumbnailsUrl = hlsUrl && video.previewsKey ? storage.getUrl(video.previewsKey) : null;
 
-    const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id } }) 
+    const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id }, status: { $ne: 'processing' } })
       .sort({ uploadedAt: -1 })
-      .limit(5) 
-      .select('title user thumbnailUrl views uploadedAt')
+      .limit(12)
+      .select('title user thumbnailUrl views uploadedAt duration')
       .populate('user', 'username avatarUrl') 
       .lean();
  
@@ -75,7 +77,10 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     ]);
     const authorTheme = authorConfig && authorConfig.theme ? authorConfig.theme : null;
 
+    const channelVideos = video.user ? await VideoMeta.countDocuments({ user: video.user._id }) : 0;
+
     res.render('player', {
+      channelVideos,
       title: video.title,
       authorTheme,
       viewerPreset: currentUser ? viewerPreset || {} : null,
@@ -84,6 +89,7 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
       processing,
       hlsUrl,
       progressiveUrl,
+      thumbnailsUrl,
       video,
       user: currentUser, 
       recommendedVideos 

@@ -1,26 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const deleteUserCascade = require('../utils/deleteUser');
 
+// Accounts are deleted only by their owner from the profile page (POST /userprofile/deleteUser,
+// which checks the session). There is intentionally no unauthenticated delete endpoint here.
 router.get('/', function (req, res) {
-  res.send('respond with a resource');
-});
-
-router.delete('/delete/:id', async (req, res) => {
-  const userId = req.params.id;
-
-  try {
-    const result = await deleteUserCascade(userId);
-
-    if (result.success) {
-      return res.status(200).send('User and all related content deleted successfully.');
-    } else {
-      return res.status(500).send(`Failed to delete user: ${result.error}`);
-    }
-  } catch (err) {
-    console.error('Unexpected error in user deletion:', err);
-    res.status(500).send('Internal Server Error');
-  }
+  res.redirect('/userprofile');
 });
 
 module.exports = router;

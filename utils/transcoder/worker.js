@@ -8,6 +8,7 @@ const storage = require('../storage');
 const { probe } = require('../ffmpeg');
 const { buildLadder, describeSource } = require('./ladder');
 const { transcodeToHls, FFMPEG } = require('./hls');
+const { backfillPreviews } = require('./previews');
 
 const POLL_MS = Number(process.env.TRANSCODE_POLL_MS) || 3000;
 const MAX_ATTEMPTS = 2;
@@ -72,7 +73,7 @@ async function processJob(job) {
         files += await storage.putDir(prefix, workDir, { move: true });
         await VideoMeta.updateOne(
           { _id: video._id },
-          { status: 'ready', hls: { masterKey: `${prefix}/master.m3u8`, renditions: ready }, duration: info.duration },
+          { status: 'ready', hls: { masterKey: `${prefix}/master.m3u8`, renditions: ready }, previewsKey: `${prefix}/thumbs.vtt`, duration: info.duration },
         );
         console.log(`[transcoder] ${video._id}: ${ready.map((r) => r.name).join(', ')} published after ${((Date.now() - started) / 1000).toFixed(1)}s`);
       },
@@ -84,6 +85,7 @@ async function processJob(job) {
       {
         status: 'ready',
         hls: { masterKey: `${prefix}/master.m3u8`, renditions: ladder },
+        previewsKey: `${prefix}/thumbs.vtt`,
         duration: info.duration,
         processingProgress: 1,
         $unset: { processingError: 1 },
@@ -157,6 +159,10 @@ async function startWorker() {
   timer = setInterval(tick, POLL_MS);
   tick();
   console.log(`[transcoder] worker started (codec ${CODEC}, ffmpeg: ${FFMPEG})`);
+  // Seek-bar previews for videos transcoded before the feature existed (in the background).
+  backfillPreviews((msg) => console.log(msg))
+    .then((n) => n && console.log(`[previews] ${n} video(s) checked`))
+    .catch((err) => console.error('[previews] backfill failed:', err.message));
 }
 
 module.exports = { enqueue, startWorker, processJob };

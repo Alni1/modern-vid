@@ -17,12 +17,12 @@ const videoMetaSchema = new mongoose.Schema({
   status: { type: String, enum: ['processing', 'ready', 'failed'], default: 'ready' },
   processingProgress: { type: Number, default: 0 },
   processingError: String,
+  // WebVTT with seek-bar preview frames (sprite sheets next to it).
+  previewsKey: String,
   hls: {
     masterKey: String,
     renditions: [{ _id: false, name: String, width: Number, height: Number, fps: Number, videoKbps: Number, audioKbps: Number }],
   },
-  // Legacy: videos uploaded to Firebase Storage by the first version of the platform.
-  firebasePath: String,
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   views: { type: Number, default: 0 },
   thumbnailUrl: { type: String },
@@ -36,4 +36,4 @@ const videoMetaSchema = new mongoose.Schema({
   collection: 'videoMeta'
 });
 
-module.exports = mongoose.model('VideoMeta', videoMetaSchema);
+module.exports = mongoose.model('VideoMeta', videoMetaSchema);

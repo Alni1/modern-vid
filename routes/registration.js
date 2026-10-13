@@ -4,7 +4,16 @@ const router = express.Router();
 
 
 const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
 const User = require('../schemas/userSchema');
+
+// Mass sign-up protection: at most 5 new accounts per IP per hour.
+const registrationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  skipFailedRequests: true,
+  handler: (req, res) => res.status(429).render('registration', { title: 'Registration', error: 'Too many sign-ups from this network. Please try again later.' }),
+});
 
 
 router.get('/', function(req, res, next){ 
@@ -12,12 +21,12 @@ router.get('/', function(req, res, next){
 });
 
 
-router.post('/', async function(req, res, next){
+router.post('/', registrationLimiter, async function(req, res, next){
 
     const { login, password, username } = req.body;
 
     if (!password || password.length < 6) {
-        return res.render('registration', {
+        return res.status(400).render('registration', {
             title: "Registration",
             error: "Password must be at least 6 characters long.",
             
@@ -31,9 +40,10 @@ router.post('/', async function(req, res, next){
 
         await user.save(); 
         
-        res.cookie('token', user.JWT, { 
-            maxAge: 604800000, 
-            secure: process.env.NODE_ENV === 'production', 
+        res.cookie('token', user.JWT, {
+            maxAge: 604800000,
+            httpOnly: true, // not readable from page scripts
+            secure: process.env.NODE_ENV === 'production',
         })
         .redirect('/');
     } catch (e) {
@@ -45,9 +55,18 @@ router.post('/', async function(req, res, next){
                 errors[field] = e.errors[field].message;
             }
       
-            return res.render('registration', {
+            return res.status(400).render('registration', {
                 title: "Registration",
                 validationError: errors, 
+                loginValue: login,
+                usernameValue: username
+            });
+        }
+
+        if (e.code === 11000) {
+            return res.status(409).render('registration', {
+                title: "Registration",
+                error: "This login is already taken.",
                 loginValue: login,
                 usernameValue: username
             });
@@ -62,4 +81,4 @@ router.post('/', async function(req, res, next){
     }
 })
 
-module.exports = router;
+module.exports = router;
