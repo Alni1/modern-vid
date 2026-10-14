@@ -25,6 +25,9 @@ const videoMetaSchema = new mongoose.Schema({
   },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   views: { type: Number, default: 0 },
+  // Hidden by a moderator: visible only to the author (with the reason) and to moderators.
+  hiddenAt: { type: Date, default: null },
+  hiddenReason: { type: String, default: '' },
   thumbnailUrl: { type: String },
   category: {
     type: String,

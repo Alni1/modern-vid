@@ -64,7 +64,7 @@
 
         <div class="pf-identity">
           <h1 class="pf-name"><%= user.username %></h1>
-          <p class="pf-handle">@<%= user.login %><% if (joined) { %> · Joined <%= joined %><% } %></p>
+          <p class="pf-handle">@<span id="pfLogin"><%= user.login %></span><% if (joined) { %> · Joined <%= joined %><% } %></p>
           <ul class="pf-stats">
             <li><strong><%= videos.length %></strong> <%= videos.length === 1 ? 'video' : 'videos' %></li>
             <li><strong><%= compact(totalViews) %></strong> <%= totalViews === 1 ? 'view' : 'views' %></li>
@@ -80,11 +80,19 @@
       </div>
     </section>
 
+    <% if (user.bannedUntil && new Date(user.bannedUntil) > new Date()) { %>
+      <p class="pf-restricted" role="status">
+        <strong>Your account is restricted<%= new Date(user.bannedUntil).getFullYear() > 9000 ? '' : ' until ' + new Date(user.bannedUntil).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) %>.</strong>
+        <% if (user.banReason) { %>Reason: <%= user.banReason %>.<% } %>
+        You can watch videos, but cannot upload, comment or send reports.
+      </p>
+    <% } %>
     <!-- ============ Tabs ============ -->
     <nav class="pf-tabs" role="tablist" aria-label="Profile sections">
       <button type="button" role="tab" class="pf-tab" id="tab-videos" aria-controls="panel-videos" data-tab="videos">
         Videos <span class="pf-count"><%= videos.length %></span>
       </button>
+      <button type="button" role="tab" class="pf-tab" id="tab-analytics" aria-controls="panel-analytics" data-tab="analytics">Analytics</button>
       <button type="button" role="tab" class="pf-tab" id="tab-theme" aria-controls="panel-theme" data-tab="theme">Player theme</button>
       <button type="button" role="tab" class="pf-tab" id="tab-account" aria-controls="panel-account" data-tab="account">Account</button>
     </nav>
@@ -126,7 +134,9 @@
                 <% } else { %>
                   <span class="pf-thumb-empty"></span>
                 <% } %>
-                <% if (video.status === 'processing') { %>
+                <% if (video.hiddenAt) { %>
+                  <span class="pf-badge pf-badge-hidden" title="<%= video.hiddenReason || '' %>">Hidden by moderators</span>
+                <% } else if (video.status === 'processing') { %>
                   <span class="pf-badge pf-badge-work">Processing <%= Math.round((video.processingProgress || 0) * 100) %>%</span>
                 <% } else if (video.status === 'ready' && video.hls && video.hls.masterKey && video.processingProgress < 1) { %>
                   <span class="pf-badge pf-badge-work">HD in progress <%= Math.round(video.processingProgress * 100) %>%</span>
@@ -154,6 +164,19 @@
         </ul>
         <p class="pf-no-match" id="noMatch" hidden>No videos match your search.</p>
       <% } %>
+    </section>
+
+    <!-- ============ Analytics (filled by /javascripts/analytics.js) ============ -->
+    <section class="pf-panel an" role="tabpanel" id="panel-analytics" aria-labelledby="tab-analytics" hidden>
+      <div class="an-toolbar">
+        <div class="an-crumb" id="anCrumb"><h2>Channel analytics</h2></div>
+        <div class="an-range" role="radiogroup" aria-label="Period">
+          <button type="button" role="radio" data-days="7" aria-checked="false">7 days</button>
+          <button type="button" role="radio" data-days="28" aria-checked="true">28 days</button>
+          <button type="button" role="radio" data-days="90" aria-checked="false">90 days</button>
+        </div>
+      </div>
+      <div id="anBody" aria-live="polite"><p class="pf-muted an-loading">Loading…</p></div>
     </section>
 
     <!-- ============ Player theme ============ -->
@@ -239,11 +262,57 @@
       <div class="pf-account">
         <div class="pf-card-box">
           <h2>Profile</h2>
-          <dl class="pf-details">
-            <div><dt>Display name</dt><dd><%= user.username %></dd></div>
-            <div><dt>Login</dt><dd><%= user.login %></dd></div>
-            <% if (joined) { %><div><dt>Member since</dt><dd><%= joined %></dd></div><% } %>
-          </dl>
+          <div class="pf-settings" id="accountSettings">
+            <div class="pf-setting">
+              <div class="pf-setting-row">
+                <span class="pf-setting-label">Display name</span>
+                <span class="pf-setting-value" data-value="username"><%= user.username %></span>
+                <button type="button" class="pf-link" data-edit="name">Change</button>
+              </div>
+              <form class="pf-edit" data-form="name" data-url="/api/account/name" hidden novalidate>
+                <label class="pf-field"><span>New display name</span>
+                  <input type="text" name="username" maxlength="50" required value="<%= user.username %>" autocomplete="name"></label>
+                <p class="pf-edit-hint">Shown on your channel and next to your comments. Any language, spaces allowed.</p>
+                <p class="pf-edit-error" role="alert" hidden></p>
+                <div class="pf-edit-actions"><button type="button" class="pf-btn pf-btn-ghost" data-cancel>Cancel</button><button type="submit" class="pf-btn pf-btn-primary">Save</button></div>
+              </form>
+            </div>
+            <div class="pf-setting">
+              <div class="pf-setting-row">
+                <span class="pf-setting-label">Login</span>
+                <span class="pf-setting-value" data-value="login"><%= user.login %></span>
+                <button type="button" class="pf-link" data-edit="login">Change</button>
+              </div>
+              <form class="pf-edit" data-form="login" data-url="/api/account/login" hidden novalidate>
+                <label class="pf-field"><span>New login</span>
+                  <input type="text" name="login" minlength="3" maxlength="30" required spellcheck="false" autocapitalize="none" autocomplete="username" placeholder="e.g. alex.konev"></label>
+                <p class="pf-edit-hint">One word for signing in: Latin letters, digits, dots, underscores or hyphens. From now on you sign in with the new login.</p>
+                <label class="pf-field"><span>Current password</span>
+                  <input type="password" name="password" required autocomplete="current-password"></label>
+                <p class="pf-edit-error" role="alert" hidden></p>
+                <div class="pf-edit-actions"><button type="button" class="pf-btn pf-btn-ghost" data-cancel>Cancel</button><button type="submit" class="pf-btn pf-btn-primary">Change login</button></div>
+              </form>
+            </div>
+            <div class="pf-setting">
+              <div class="pf-setting-row">
+                <span class="pf-setting-label">Password</span>
+                <span class="pf-setting-value" aria-label="hidden">••••••••</span>
+                <button type="button" class="pf-link" data-edit="password">Change</button>
+              </div>
+              <form class="pf-edit" data-form="password" data-url="/api/account/password" hidden novalidate>
+                <label class="pf-field"><span>Current password</span>
+                  <input type="password" name="password" required autocomplete="current-password"></label>
+                <label class="pf-field"><span>New password</span>
+                  <input type="password" name="newPassword" minlength="6" required autocomplete="new-password" placeholder="At least 6 characters"></label>
+                <p class="pf-edit-hint">Your other devices will be signed out.</p>
+                <p class="pf-edit-error" role="alert" hidden></p>
+                <div class="pf-edit-actions"><button type="button" class="pf-btn pf-btn-ghost" data-cancel>Cancel</button><button type="submit" class="pf-btn pf-btn-primary">Change password</button></div>
+              </form>
+            </div>
+            <% if (joined) { %>
+              <div class="pf-setting"><div class="pf-setting-row"><span class="pf-setting-label">Member since</span><span class="pf-setting-value"><%= joined %></span></div></div>
+            <% } %>
+          </div>
           <form action="/userprofile/avatar" method="POST" enctype="multipart/form-data" class="pf-avatar-row">
             <% if (user.avatarUrl) { %>
               <img src="<%= user.avatarUrl %>" alt="" class="pf-avatar-small" />
@@ -259,10 +328,15 @@
 
         <div class="pf-card-box">
           <h2>Session</h2>
-          <p class="pf-muted">Sign out of ModernVid on this device.</p>
-          <form method="POST" action="/logout" class="pf-form-actions" style="margin-top: 12px;">
-            <button type="submit" class="pf-btn pf-btn-ghost">Sign out</button>
-          </form>
+          <p class="pf-muted">You stay signed in for 30 days after your last visit. Sign out here, or end the sessions on all your devices if you used a computer you do not own or think someone else has access to your account.</p>
+          <div class="pf-form-actions" style="margin-top: 12px; flex-wrap: wrap;">
+            <form method="POST" action="/logout">
+              <button type="submit" class="pf-btn pf-btn-ghost">Sign out</button>
+            </form>
+            <form method="POST" action="/logout/all">
+              <button type="submit" class="pf-btn pf-btn-ghost">Sign out of all devices</button>
+            </form>
+          </div>
         </div>
 
         <div class="pf-card-box pf-danger">
@@ -325,5 +399,6 @@
   <div class="pf-toast" id="toast" role="status" hidden></div>
 
   <script src="/javascripts/profile.js" defer></script>
+  <script src="/javascripts/analytics.js" defer></script>
 </body>
 </html>

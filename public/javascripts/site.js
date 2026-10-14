@@ -57,3 +57,18 @@
     sync();
   });
 })();
+
+// Moderators: number of open reports next to the moderation link in the header.
+(function () {
+  const badge = document.getElementById('modCount');
+  if (!badge) return;
+  fetch('/api/moderation/summary', { headers: { Accept: 'application/json' } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!data || !data.openReports) return;
+      badge.textContent = data.openReports > 99 ? '99+' : String(data.openReports);
+      badge.hidden = false;
+      badge.parentElement.setAttribute('aria-label', `Moderation: ${data.openReports} open reports`);
+    })
+    .catch(() => {});
+})();

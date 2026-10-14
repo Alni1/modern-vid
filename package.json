@@ -12,7 +12,8 @@
     "retranscode": "node scripts/retranscode.js",
     "cleanup-legacy": "node scripts/cleanup-legacy.js",
     "previews": "node scripts/previews.js",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "make-admin": "node scripts/make-admin.js"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

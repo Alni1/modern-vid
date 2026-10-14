@@ -2,6 +2,8 @@
   const hdrUser = typeof user !== 'undefined' && user ? user : null;
   const hdrQuery = typeof query !== 'undefined' && query ? query : '';
   const hdrCategory = typeof category !== 'undefined' && category ? category : '';
+  const hdrStaff = hdrUser && (hdrUser.role === 'moderator' || hdrUser.role === 'admin');
+  const hdrBanned = hdrUser && hdrUser.bannedUntil && new Date(hdrUser.bannedUntil) > new Date();
 %>
 <header class="site-header">
   <a href="/" class="site-logo" aria-label="ModernVid home">
@@ -43,6 +45,15 @@
       </div>
     </div>
     <% if (hdrUser) { %>
+      <% if (hdrStaff) { %>
+        <a href="/moderation" class="site-icon-btn site-staff" title="Moderation" aria-label="Moderation" style="position: relative;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span class="site-staff-count" id="modCount" hidden></span>
+        </a>
+      <% } %>
+      <% if (hdrBanned) { %>
+        <a href="/userprofile#account" class="site-flag" title="<%= hdrUser.banReason || 'Your account is restricted' %>">Restricted</a>
+      <% } %>
       <a href="/userprofile#upload" class="site-btn site-btn-primary site-upload" title="Upload video">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
         <span>Upload</span>

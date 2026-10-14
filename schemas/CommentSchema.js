@@ -5,10 +5,13 @@ const commentSchema = new Schema({
   video: { type: Schema.Types.ObjectId, ref: 'VideoMeta', required: true },
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   text: { type: String, required: true, trim: true, maxlength: 1000 },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  // Hidden by a moderator: visible only to the comment's author and to moderators.
+  hiddenAt: { type: Date, default: null },
+  hiddenReason: { type: String, default: '' },
 }, {
   timestamps: true,
   collection: 'comDB' 
 });
 
-module.exports = mongoose.model('Comment', commentSchema);
+module.exports = mongoose.model('Comment', commentSchema);

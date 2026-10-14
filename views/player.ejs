@@ -28,6 +28,9 @@
   const initial = (name) => (name || '?').trim().charAt(0).toUpperCase();
   const owner = video && video.user ? video.user : null;
   const comments = video && video.comments ? video.comments : [];
+  const me = user ? String(user._id) : null;
+  const ownerId = owner ? String(owner._id) : null;
+  const fullDate = (d) => d ? new Date(d).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '';
   const progress = Math.round(((video && video.processingProgress) || 0) * 100);
 %>
 <body>
@@ -47,6 +50,7 @@
         </div>
       <% } else if (playable) { %>
         <mv-player id="my-player"
+                   data-video-id="<%= video._id %>"
                    src="<%= hlsUrl || progressiveUrl %>"
                    <% if (hlsUrl) { %>fallback-src="<%= progressiveUrl %>"<% } %>
                    <% if (video.thumbnailUrl) { %>poster="<%= video.thumbnailUrl %>"<% } %>
@@ -60,6 +64,12 @@
         <div class="watch-placeholder"><p class="watch-placeholder-title">This video is no longer available.</p></div>
       <% } %>
 
+      <% if (video.hiddenAt) { %>
+        <p class="watch-hidden" role="status">
+          <strong>Hidden by moderators</strong><% if (video.hiddenReason) { %>: <%= video.hiddenReason %><% } %>.
+          Only the author and moderators can see this video.
+        </p>
+      <% } %>
       <h1 class="watch-title"><%= video.title || 'Untitled' %></h1>
 
       <div class="watch-bar">
@@ -77,6 +87,12 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
             Copy link
           </button>
+          <% if (me && ownerId && me !== ownerId) { %>
+            <button type="button" class="watch-pill" id="reportVideo" data-report="video" data-target="<%= video._id %>">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+              Report
+            </button>
+          <% } %>
         </div>
       </div>
 
@@ -94,8 +110,10 @@
       </section>
 
       <section class="watch-comments" aria-labelledby="commentsTitle">
-        <h2 id="commentsTitle"><span id="commentCount"><%= comments.length %></span> <%= comments.length === 1 ? 'comment' : 'comments' %></h2>
-        <% if (user) { %>
+        <h2 id="commentsTitle"><span id="commentCount"><%= comments.length %></span> <span id="commentWord"><%= comments.length === 1 ? 'comment' : 'comments' %></span></h2>
+        <% if (user && user.bannedUntil && new Date(user.bannedUntil) > new Date()) { %>
+          <p class="comment-restricted">Your account is restricted<%= user.banReason ? ': ' + user.banReason : '' %>. You cannot comment until <%= new Date(user.bannedUntil).getFullYear() > 9000 ? 'the restriction is lifted' : fullDate(user.bannedUntil) %>.</p>
+        <% } else if (user) { %>
           <form id="commentForm" class="comment-new" data-video-id="<%= video._id %>">
             <span class="watch-avatar watch-avatar-sm" aria-hidden="true">
               <% if (user.avatarUrl) { %><img src="<%= user.avatarUrl %>" alt="" /><% } else { %><%= initial(user.username) %><% } %>
@@ -103,29 +121,50 @@
             <div class="comment-new-body">
               <textarea id="commentText" name="text" rows="1" maxlength="1000" placeholder="Add a comment…" aria-label="Add a comment" required></textarea>
               <div class="comment-new-actions" hidden>
+                <span class="comment-hint">Ctrl + Enter to post <span class="comment-counter" id="commentCounter" hidden></span></span>
                 <button type="button" class="site-btn site-btn-quiet" id="commentCancel">Cancel</button>
                 <button type="submit" class="site-btn site-btn-primary" id="commentSubmit" disabled>Comment</button>
               </div>
             </div>
           </form>
         <% } else { %>
-          <p class="watch-muted comment-login"><a href="/login">Log in</a> to leave a comment.</p>
+          <p class="comment-login"><a href="/login">Log in</a> to leave a comment.</p>
         <% } %>
 
-        <ul class="comment-list" id="commentsList">
-          <% comments.forEach(function (comment) { %>
-            <li class="comment">
+        <ul class="comment-list" id="commentsList" data-me="<%= me || '' %>" data-owner="<%= ownerId || '' %>">
+          <% comments.forEach(function (comment) {
+               const cu = comment.user;
+               const cuId = cu ? String(cu._id) : null;
+               const canDelete = me && (me === cuId || me === ownerId || isModerator);
+               const canReport = me && cuId && me !== cuId; %>
+            <li class="comment<%= comment.hiddenAt ? ' is-hidden' : '' %>" data-id="<%= comment._id %>">
               <span class="watch-avatar watch-avatar-sm" aria-hidden="true">
-                <% if (comment.user && comment.user.avatarUrl) { %><img src="<%= comment.user.avatarUrl %>" alt="" /><% } else { %><%= initial(comment.user && comment.user.username) %><% } %>
+                <% if (cu && cu.avatarUrl) { %><img src="<%= cu.avatarUrl %>" alt="" /><% } else { %><%= initial(cu && cu.username) %><% } %>
               </span>
-              <div>
-                <p class="comment-head"><strong><%= comment.user ? comment.user.username : 'User' %></strong> <span><%= ago(comment.createdAt) %></span></p>
+              <div class="comment-body">
+                <p class="comment-head">
+                  <strong class="comment-name<%= cuId && cuId === ownerId ? ' is-author' : '' %>"><%= cu ? cu.username : 'Deleted user' %></strong>
+                  <% if (cuId && cuId === ownerId) { %><span class="comment-badge">Author</span><% } %>
+                  <time datetime="<%= comment.createdAt ? new Date(comment.createdAt).toISOString() : '' %>" title="<%= fullDate(comment.createdAt) %>"><%= ago(comment.createdAt) %></time>
+                </p>
+                <% if (comment.hiddenAt) { %><p class="comment-hidden-note">Hidden by moderators<%= comment.hiddenReason ? ': ' + comment.hiddenReason : '' %>. Only you and moderators can see it.</p><% } %>
                 <p class="comment-text"><%= comment.text %></p>
+                <button type="button" class="comment-more" hidden>Read more</button>
               </div>
+              <% if (canDelete || canReport) { %>
+                <div class="comment-tools">
+                  <% if (canReport) { %>
+                    <button type="button" class="comment-tool comment-report" data-report="comment" aria-label="Report comment" title="Report comment"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></button>
+                  <% } %>
+                  <% if (canDelete) { %>
+                    <button type="button" class="comment-tool comment-delete" aria-label="Delete comment" title="Delete comment"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
+                  <% } %>
+                </div>
+              <% } %>
             </li>
           <% }) %>
         </ul>
-        <% if (comments.length === 0) { %><p class="watch-muted" id="noComments">No comments yet. Be the first!</p><% } %>
+        <p class="comment-empty" id="noComments"<% if (comments.length) { %> hidden<% } %>>No comments yet. Be the first!</p>
       </section>
     </div>
 
@@ -155,6 +194,27 @@
     </aside>
   </main>
 
+  <% if (me) { %>
+    <dialog class="report-dialog" id="reportDialog" aria-labelledby="reportTitle">
+      <form method="dialog" id="reportForm">
+        <h2 id="reportTitle">Report</h2>
+        <p class="report-sub" id="reportSub">What is wrong with it?</p>
+        <fieldset class="report-reasons">
+          <legend class="sr-only">Reason</legend>
+          <% Object.keys(reportReasons).forEach(function (key) { %>
+            <label><input type="radio" name="reason" value="<%= key %>" required> <%= reportReasons[key] %></label>
+          <% }) %>
+        </fieldset>
+        <label class="report-note-label" for="reportNote">Details <span>(optional)</span></label>
+        <textarea id="reportNote" name="note" maxlength="500" rows="3" placeholder="Anything that helps moderators"></textarea>
+        <p class="report-error" id="reportError" role="alert" hidden></p>
+        <div class="report-actions">
+          <button type="button" class="site-btn site-btn-quiet" id="reportCancel">Cancel</button>
+          <button type="submit" class="site-btn site-btn-primary" id="reportSubmit">Send report</button>
+        </div>
+      </form>
+    </dialog>
+  <% } %>
   <div class="site-toast" id="toast" role="status" hidden></div>
   <script src="/javascripts/watch.js" defer></script>
 </body>

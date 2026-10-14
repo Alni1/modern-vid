@@ -7,6 +7,7 @@ const { randomUUID } = require('crypto');
 const VideoMeta = require('../schemas/VideoMeta');
 const User = require('../schemas/userSchema');
 const verifyToken = require('../middlewares/verifyToken');
+const { requireActiveUser } = require('../middlewares/roles');
 const storage = require('../utils/storage');
 const { probe, makeThumbnail } = require('../utils/ffmpeg');
 const { enqueue } = require('../utils/transcoder/worker');
@@ -31,7 +32,7 @@ const upload = multer({
   },
 });
 
-router.post('/', verifyToken, (req, res, next) => {
+router.post('/', requireActiveUser, (req, res, next) => {
   upload.single('video')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File too large. Max size is 1GB.' });

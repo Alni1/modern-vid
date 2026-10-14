@@ -12,14 +12,28 @@
 <%- include('partials/header', { user: typeof user !== 'undefined' ? user : null, query: typeof query !== 'undefined' ? query : '' }) %>
 
 <main class="site-main">
-  <h1 class="page-title">Latest videos</h1>
-  <% if (videos && videos.length > 0) { %>
-    <div class="vgrid">
-      <% videos.forEach(function (video) { %><%- include('partials/video-card', { video: video }) %><% }) %>
-    </div>
-  <% } else { %>
-    <p class="empty-state">No videos uploaded yet.</p>
+  <% if (typeof popular !== 'undefined' && popular.length) { %>
+    <section class="home-section" aria-labelledby="popularTitle">
+      <h1 class="page-title" id="popularTitle">Popular this week</h1>
+      <div class="vgrid">
+        <% popular.forEach(function (video) { %><%- include('partials/video-card', { video: video }) %><% }) %>
+      </div>
+    </section>
   <% } %>
+  <section class="home-section" aria-labelledby="latestTitle">
+    <% if (typeof popular !== 'undefined' && popular.length) { %>
+      <h2 class="page-title" id="latestTitle">New videos</h2>
+    <% } else { %>
+      <h1 class="page-title" id="latestTitle">Latest videos</h1>
+    <% } %>
+    <% if (videos && videos.length > 0) { %>
+      <div class="vgrid">
+        <% videos.forEach(function (video) { %><%- include('partials/video-card', { video: video }) %><% }) %>
+      </div>
+    <% } else { %>
+      <p class="empty-state">No videos uploaded yet.</p>
+    <% } %>
+  </section>
 </main>
 
 </body>

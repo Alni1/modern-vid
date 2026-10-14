@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken'); 
-const User = require('../schemas/userSchema'); 
 const mongoose = require('mongoose');
 const VideoMeta = require('../schemas/VideoMeta');
 const storage = require('../utils/storage');
 const { loadPreset } = require('./presets');
+const recommendations = require('../utils/recommendations');
+const { canSeeHidden, isModerator, REASONS } = require('../utils/moderation');
 const rateLimit = require('express-rate-limit');
+const { optionalAuth } = require('../utils/auth');
 
 const playerRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -14,46 +15,37 @@ const playerRateLimiter = rateLimit({
 });
 
 
-router.get('/:id', playerRateLimiter, async (req, res) => {
-  let currentUser = null;
+router.get('/:id', playerRateLimiter, optionalAuth, async (req, res) => {
+  const currentUser = req.user || null;
   try {
-    const token = req.cookies.token;
-
-    if (token && process.env.SECRET_KEY) {
-      try {
-        const decoded = jwt.verify(token, process.env.SECRET_KEY);
-        currentUser = await User.findById(decoded.id).lean();
-      } catch (err) {
-        console.warn('Player page: Invalid or expired token, proceeding as guest.', err.message);
-
-        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-            res.clearCookie('token');
-        }
-      }
-    }
-
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(404).render('error', { message: 'Video not found', error: { status: 404 }, user: currentUser });
     }
 
-    const video = await VideoMeta.findByIdAndUpdate(
-      req.params.id,
-      { $inc: { views: 1 } },
-      { new: true }
-    )
-    .populate('user', 'username avatarUrl') 
-    .populate({ 
-      path: 'comments',
-      populate: { 
-        path: 'user',
-        select: 'username avatarUrl' 
-      },
-      options: { sort: { createdAt: -1 } } 
-    });
+    const video = await VideoMeta.findById(req.params.id)
+      .populate('user', 'username avatarUrl')
+      .populate({
+        path: 'comments',
+        populate: { path: 'user', select: 'username avatarUrl' },
+        options: { sort: { createdAt: -1 } },
+      })
+      .lean();
 
     if (!video) {
       return res.status(404).render('error', { message: 'Video not found', error: { status: 404 }, user: currentUser });
     }
+    // A video hidden by moderators is shown only to its author (with the reason) and to moderators.
+    const ownerId = video.user ? video.user._id : null;
+    if (video.hiddenAt && !canSeeHidden(currentUser, ownerId)) {
+      return res.status(404).render('error', { message: 'This video is not available', error: { status: 404 }, user: currentUser });
+    }
+    if (!video.hiddenAt) {
+      await VideoMeta.updateOne({ _id: video._id }, { $inc: { views: 1 } });
+      video.views = (video.views || 0) + 1;
+    }
+    // Hidden comments: visible to their authors and to moderators only (marked as hidden).
+    video.comments = (video.comments || []).filter((c) => c && (!c.hiddenAt || canSeeHidden(currentUser, c.user && c.user._id)));
+
     // Videos from the first version were stored in Firebase Storage, which is no longer available.
     const playable = Boolean(video.storageKey);
     const processing = video.status === 'processing';
@@ -63,12 +55,28 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     // Seek-bar preview frames (WebVTT + sprite sheets), produced together with the first quality.
     const thumbnailsUrl = hlsUrl && video.previewsKey ? storage.getUrl(video.previewsKey) : null;
 
-    const recommendedVideos = await VideoMeta.find({ _id: { $ne: video._id }, status: { $ne: 'processing' } })
-      .sort({ uploadedAt: -1 })
-      .limit(12)
-      .select('title user thumbnailUrl views uploadedAt duration')
-      .populate('user', 'username avatarUrl') 
-      .lean();
+    // "Up next": content similarity, watched share, freshness and co-watching (utils/recommend.js).
+    // Videos the signed-in viewer has already watched to the end are skipped.
+    const recSelect = 'title user thumbnailUrl views uploadedAt duration';
+    let recommendedVideos = [];
+    try {
+      if (video.status !== 'ready') throw new Error('only ready videos have recommendations');
+      const watched = currentUser ? await recommendations.watchedBy(currentUser._id) : [];
+      const ids = await recommendations.forVideo(video._id, { limit: 12, exclude: watched });
+      const found = await VideoMeta.find({ _id: { $in: ids }, status: 'ready', hiddenAt: null }).select(recSelect).populate('user', 'username avatarUrl').lean();
+      const byId = new Map(found.map((v) => [String(v._id), v]));
+      recommendedVideos = ids.map((id) => byId.get(id)).filter(Boolean);
+    } catch (err) {
+      if (video.status === 'ready') console.error('Recommendations failed, showing the latest videos:', err.message);
+    }
+    if (recommendedVideos.length < 12) {
+      // Not enough recommendations (small catalogue or an error): fill up with the latest videos.
+      const have = recommendedVideos.map((v) => v._id).concat(video._id);
+      const latest = await VideoMeta.find({ _id: { $nin: have }, status: { $ne: 'processing' }, hiddenAt: null })
+        .sort({ uploadedAt: -1 }).limit(12 - recommendedVideos.length)
+        .select(recSelect).populate('user', 'username avatarUrl').lean();
+      recommendedVideos = recommendedVideos.concat(latest);
+    }
  
     // Player customization: the channel's theme and the signed-in viewer's own settings.
     const [authorConfig, viewerPreset] = await Promise.all([
@@ -77,9 +85,11 @@ router.get('/:id', playerRateLimiter, async (req, res) => {
     ]);
     const authorTheme = authorConfig && authorConfig.theme ? authorConfig.theme : null;
 
-    const channelVideos = video.user ? await VideoMeta.countDocuments({ user: video.user._id }) : 0;
+    const channelVideos = video.user ? await VideoMeta.countDocuments({ user: video.user._id, hiddenAt: null }) : 0;
 
     res.render('player', {
+      isModerator: isModerator(currentUser),
+      reportReasons: REASONS,
       channelVideos,
       title: video.title,
       authorTheme,

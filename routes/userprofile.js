@@ -9,6 +9,10 @@ const path = require('path');
 const storage = require('../utils/storage');
 const { loadPreset } = require('./presets');
 const PlayerPreset = require('../schemas/PlayerPreset');
+const ViewSession = require('../schemas/ViewSession');
+const RefreshToken = require('../schemas/RefreshToken');
+const { clearSessionCookies } = require('../utils/auth');
+const { deleteVideoCompletely } = require('../utils/moderation');
 
 const avatarStorage = multer.memoryStorage(); 
 const avatarUpload = multer({
@@ -34,7 +38,7 @@ router.get('/', verifyToken, async (req, res) => {
   
   if (!req.user || !req.user._id) {
     debug('[USERPROFILE_ROUTE_DEBUG] req.user or req.user._id is missing after verifyToken. This should not happen. Redirecting.');
-    return res.clearCookie('token').redirect('/login');
+    return res.redirect('/login');
   }
 
   try {
@@ -45,7 +49,7 @@ router.get('/', verifyToken, async (req, res) => {
     if (!userFromDB) {
       
       debug('[USERPROFILE_ROUTE_DEBUG] User not found in DB within route handler for ID:', req.user._id, '. Clearing cookie and redirecting.');
-      return res.clearCookie('token').redirect('/login');
+      return res.redirect('/login');
     }
     debug('[USERPROFILE_ROUTE_DEBUG] User successfully fetched from DB in route handler.');
     debug('[USERPROFILE_ROUTE_DEBUG] userFromDB after populate, before lean (raw Mongoose doc):', userFromDB); // Log before .lean() if possible, or just the lean object
@@ -119,9 +123,7 @@ router.post('/video/delete/:videoId', verifyToken, async (req, res) => {
     }
 
     
-    await deleteVideoFiles(video);
-    await VideoMeta.deleteOne({ _id: videoId, user: userId });
-    await User.findByIdAndUpdate(userId, { $pull: { videos: videoId } });
+    await deleteVideoCompletely(video);
 
     res.redirect('/userprofile');
   } catch (err) {
@@ -144,9 +146,11 @@ router.post('/deleteUser', verifyToken, async (req, res) => {
     if (avatarKey) await storage.delete(avatarKey).catch(() => {});
     await VideoMeta.deleteMany({ user: userId });
     await PlayerPreset.deleteMany({ owner: userId });
+    await ViewSession.deleteMany({ channel: userId });
     await User.findByIdAndDelete(userId);
+    await RefreshToken.deleteMany({ user: userId });
 
-    res.clearCookie('token');
+    clearSessionCookies(res);
     res.redirect('/');
   } catch (err) {
     console.error('Error deleting user:', err);

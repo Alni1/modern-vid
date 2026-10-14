@@ -8,6 +8,7 @@ var cookieParser = require('cookie-parser');
 var mongoose = require('mongoose');
 const storage = require('./utils/storage');
 const { startWorker } = require('./utils/transcoder/worker');
+const { migrateLegacyAuth } = require('./utils/auth');
 
 
 
@@ -26,6 +27,10 @@ const searchRouter = require('./routes/search');
 const userProfileRouter = require('./routes/userprofile');
 const commentRouter = require('./routes/comment'); 
 const presetsRouter = require('./routes/presets');
+const analyticsRouter = require('./routes/analytics');
+const reportsRouter = require('./routes/reports');
+const accountRouter = require('./routes/account');
+const moderation = require('./routes/moderation');
 
 
 var usersRouter = require('./routes/users');
@@ -33,8 +38,9 @@ var registrationRouter = require('./routes/registration');
 var loginRouter = require('./routes/login');
 
 mongoose.connect(process.env.MONGODB_URL)
-.then(() => {
+.then(async () => {
   console.log('MongoDB connected');
+  await migrateLegacyAuth().catch((err) => console.warn('[auth] migration failed:', err.message));
   return startWorker();
 })
 .catch((err) => console.error('MongoDB connection error:', err));
@@ -63,6 +69,11 @@ app.use('/search', searchRouter);
 app.use('/userprofile', userProfileRouter); // user profile route
 app.use('/comments', commentRouter); // Use comment router
 app.use('/api/presets', presetsRouter); // player settings: viewer presets and channel themes
+app.use('/api/analytics', analyticsRouter); // watch reports and channel statistics
+app.use('/api/reports', reportsRouter); // complaints about videos and comments
+app.use('/api/account', accountRouter); // display name, login and password of the signed-in user
+app.use('/api/moderation', moderation.api); // moderation API (moderators and administrators)
+app.use('/moderation', moderation.page); // moderation panel
 app.use('/logout', logoutRouter);
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

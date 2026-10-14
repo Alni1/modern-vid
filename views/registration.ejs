@@ -25,11 +25,17 @@
 
       <label for="login">Login</label>
       <input type="text" name="login" id="login" autocomplete="username" required
+             minlength="3" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{2,29}" spellcheck="false" autocapitalize="none"
+             aria-describedby="loginHint" placeholder="e.g. alex.konev"
+             title="One word: Latin letters, digits, dots, underscores or hyphens (3–30 characters)"
              value="<%= typeof loginValue !== 'undefined' ? loginValue : '' %>">
+      <p class="auth-hint" id="loginHint">One word for signing in: Latin letters, digits, <code>.</code> <code>_</code> <code>-</code></p>
 
       <label for="username">Display name</label>
-      <input type="text" name="username" id="username" autocomplete="nickname" required
+      <input type="text" name="username" id="username" autocomplete="name" required maxlength="50"
+             aria-describedby="nameHint" placeholder="e.g. Олексій Конєвіченко"
              value="<%= typeof usernameValue !== 'undefined' ? usernameValue : '' %>">
+      <p class="auth-hint" id="nameHint">Shown on your channel and comments. Any language, spaces allowed.</p>
 
       <label for="password">Password</label>
       <input type="password" name="password" id="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters" required>

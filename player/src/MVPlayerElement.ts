@@ -96,6 +96,14 @@ export class MVPlayerElement extends HTMLElement {
     return this._core;
   }
 
+  /**
+   * The underlying <video> element, for page scripts that only observe playback
+   * (e.g. watch analytics reading `played`). Control playback through the player methods.
+   */
+  get media(): HTMLVideoElement | null {
+    return this._core ? this._core.video : null;
+  }
+
   /** Effective configuration after merging system, author and viewer presets. */
   get config(): PlayerConfig {
     return this._config;

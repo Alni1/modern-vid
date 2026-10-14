@@ -6,6 +6,8 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const User = require('../schemas/userSchema');
+const { issueSession } = require('../utils/auth');
+const { loginError, displayNameError, normalizeLogin } = require('../utils/accounts');
 
 // Mass sign-up protection: at most 5 new accounts per IP per hour.
 const registrationLimiter = rateLimit({
@@ -25,6 +27,16 @@ router.post('/', registrationLimiter, async function(req, res, next){
 
     const { login, password, username } = req.body;
 
+    const accountError = loginError(login) || displayNameError(username);
+    if (accountError) {
+        return res.status(400).render('registration', {
+            title: "Registration",
+            error: accountError,
+            loginValue: login,
+            usernameValue: username
+        });
+    }
+
     if (!password || password.length < 6) {
         return res.status(400).render('registration', {
             title: "Registration",
@@ -35,17 +47,13 @@ router.post('/', registrationLimiter, async function(req, res, next){
         });
     }
 
-    const user = new User({ login, password, username }); 
+    const user = new User({ login: normalizeLogin(login), password, username: String(username).trim() }); 
     try {
 
         await user.save(); 
         
-        res.cookie('token', user.JWT, {
-            maxAge: 604800000,
-            httpOnly: true, // not readable from page scripts
-            secure: process.env.NODE_ENV === 'production',
-        })
-        .redirect('/');
+        await issueSession(req, res, user);
+        res.redirect('/');
     } catch (e) {
         logger.info(e); 
 

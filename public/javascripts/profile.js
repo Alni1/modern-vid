@@ -243,6 +243,7 @@
 
     xhr = new XMLHttpRequest();
     xhr.open('POST', '/upload', true);
+    xhr.setRequestHeader('Accept', 'application/json');
     xhr.upload.onprogress = (ev) => {
       if (!ev.lengthComputable) return;
       const p = Math.round((ev.loaded / ev.total) * 100);
@@ -281,4 +282,66 @@
   });
 
   if (wantsUpload) $('[data-open-upload]').click();
+
+  // ---------------------------------------------------------------- account: name, login, password
+  const settings = document.getElementById('accountSettings');
+  if (settings) {
+    const close = (form) => {
+      form.hidden = true;
+      form.reset();
+      form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+      form.querySelector('.pf-edit-error').hidden = true;
+    };
+    settings.querySelectorAll('[data-edit]').forEach((btn) => btn.addEventListener('click', () => {
+      settings.querySelectorAll('.pf-edit').forEach((f) => f !== btn && close(f));
+      const form = settings.querySelector(`[data-form="${btn.dataset.edit}"]`);
+      form.hidden = false;
+      form.querySelector('input').focus();
+    }));
+    settings.querySelectorAll('.pf-edit').forEach((form) => {
+      const error = form.querySelector('.pf-edit-error');
+      form.querySelector('[data-cancel]').addEventListener('click', () => close(form));
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submit = form.querySelector('[type=submit]');
+        form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+        error.hidden = true;
+        submit.disabled = true;
+        try {
+          const res = await fetch(form.dataset.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(Object.fromEntries(new FormData(form))),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            error.textContent = data.error || 'Something went wrong.';
+            error.hidden = false;
+            const field = data.field && form.querySelector(`[name="${data.field}"]`);
+            if (field) { field.setAttribute('aria-invalid', 'true'); field.focus(); }
+            return;
+          }
+          if (data.username) {
+            settings.querySelector('[data-value="username"]').textContent = data.username;
+            const h = document.querySelector('.pf-name');
+            if (h) h.textContent = data.username;
+          }
+          if (data.login) {
+            settings.querySelector('[data-value="login"]').textContent = data.login;
+            const l = document.getElementById('pfLogin');
+            if (l) l.textContent = data.login;
+          }
+          close(form);
+          if (data.username) form.querySelector('[name="username"]').defaultValue = data.username;
+          notify(form.dataset.form === 'login' ? 'Login changed. Use it the next time you sign in.'
+            : form.dataset.form === 'password' ? 'Password changed. Other devices are signed out.' : 'Display name changed.');
+        } catch {
+          error.textContent = 'Network error. Try again.';
+          error.hidden = false;
+        } finally {
+          submit.disabled = false;
+        }
+      });
+    });
+  }
 })();

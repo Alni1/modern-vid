@@ -103,6 +103,13 @@ class LocalStorage {
       index: false,
       dotfiles: 'deny',
       maxAge: '1h',
+      setHeaders(res, filePath) {
+        // Playlists and the preview track change while a video is processed (higher qualities are
+        // added to master.m3u8 later), so the browser must revalidate them on every request
+        // (cheap: unchanged files are answered with 304 thanks to ETag). Segments, sprites and
+        // thumbnails do not change and are cached.
+        if (/\.(m3u8|vtt)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+      },
     });
   }
 }

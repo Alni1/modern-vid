@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moderation | ModernVid</title>
+  <%- include('partials/head') %>
+  <link rel="stylesheet" href="/stylesheets/moderation.css" />
+</head>
+<body>
+  <%- include('partials/header', { user: user, query: '' }) %>
+
+  <main class="md" id="md" data-admin="<%= isAdmin ? '1' : '' %>" data-me="<%= user._id %>"
+        data-reasons="<%= JSON.stringify(reasons) %>" data-ban-days="<%= JSON.stringify(banDays) %>">
+    <div class="md-head">
+      <div>
+        <h1>Moderation</h1>
+        <p class="md-sub">Signed in as <strong><%= user.username %></strong> · <%= isAdmin ? 'administrator' : 'moderator' %></p>
+      </div>
+    </div>
+
+    <nav class="md-tabs" role="tablist" aria-label="Moderation sections">
+      <button type="button" role="tab" class="md-tab" id="mdtab-reports" aria-controls="md-reports" data-tab="reports">
+        Reports <span class="md-count" id="mdOpenCount" hidden></span>
+      </button>
+      <button type="button" role="tab" class="md-tab" id="mdtab-users" aria-controls="md-users" data-tab="users">Users</button>
+      <button type="button" role="tab" class="md-tab" id="mdtab-log" aria-controls="md-log" data-tab="log">Log</button>
+    </nav>
+
+    <section class="md-panel" role="tabpanel" id="md-reports" aria-labelledby="mdtab-reports">
+      <div class="md-toolbar">
+        <div class="md-seg" role="radiogroup" aria-label="Report status">
+          <button type="button" role="radio" aria-checked="true" data-status="open">Open</button>
+          <button type="button" role="radio" aria-checked="false" data-status="closed">Handled</button>
+        </div>
+        <p class="md-hint">Reports are grouped by video or comment; one action handles all reports of it.</p>
+      </div>
+      <div id="mdReports" aria-live="polite"><p class="md-empty">Loading…</p></div>
+    </section>
+
+    <section class="md-panel" role="tabpanel" id="md-users" aria-labelledby="mdtab-users" hidden>
+      <div class="md-toolbar">
+        <label class="md-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input type="search" id="mdUserQuery" placeholder="Find by login or name" aria-label="Find a user" />
+        </label>
+      </div>
+      <div id="mdUsers" aria-live="polite"></div>
+    </section>
+
+    <section class="md-panel" role="tabpanel" id="md-log" aria-labelledby="mdtab-log" hidden>
+      <div id="mdLog" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <div class="site-toast" id="toast" role="status" hidden></div>
+  <script src="/javascripts/moderation.js" defer></script>
+</body>
+</html>
