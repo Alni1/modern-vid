@@ -10,6 +10,8 @@ const Comment = require('../schemas/CommentSchema');
 const User = require('../schemas/userSchema');
 const ViewSession = require('../schemas/ViewSession');
 const Report = require('../schemas/Report');
+const Like = require('../schemas/Like');
+const Playlist = require('../schemas/Playlist');
 const ModerationLog = require('../schemas/ModerationLog');
 const storage = require('./storage');
 
@@ -95,6 +97,8 @@ async function deleteVideoCompletely(video) {
     Comment.deleteMany({ video: video._id }),
     ViewSession.deleteMany({ video: video._id }),
     User.updateOne({ _id: video.user }, { $pull: { videos: video._id } }),
+    Like.deleteMany({ video: video._id }),
+    Playlist.updateMany({ videos: video._id }, { $pull: { videos: video._id } }),
   ]);
   await closeReports('video', video._id, null, 'deleted');
 }

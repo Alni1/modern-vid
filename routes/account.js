@@ -59,7 +59,7 @@ router.post('/login', sensitiveLimiter, wrap(async (req, res) => {
 
 router.post('/password', sensitiveLimiter, wrap(async (req, res) => {
   const next = req.body && typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
-  if (next.length < 6) return res.status(400).json({ error: 'The new password must be at least 6 characters long.', field: 'newPassword' });
+  if (next.length < 8) return res.status(400).json({ error: 'The new password must be at least 8 characters long.', field: 'newPassword' });
   if (!(await checkPassword(req, res))) return;
   const user = await User.findById(req.user._id);
   user.password = next; // hashed by the pre-save hook of the schema

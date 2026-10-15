@@ -17,7 +17,7 @@ const daysAgo = (d) => new Date(Date.now() - d * 86400000);
 async function build() {
   const t0 = Date.now();
   const [videos, statRows, viewerRows, popularRows] = await Promise.all([
-    VideoMeta.find({ status: 'ready', hiddenAt: null }).select('title description tags category user uploadedAt').lean(),
+    VideoMeta.find({ status: 'ready', hiddenAt: null, visibility: { $nin: ['unlisted', 'private'] } }).select('title description tags category user uploadedAt').lean(),
     // Views and the sum of watched shares (buckets / 100) per video.
     ViewSession.aggregate([
       { $match: { counted: true, createdAt: { $gte: daysAgo(STATS_DAYS) } } },

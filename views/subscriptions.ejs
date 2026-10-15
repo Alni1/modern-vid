@@ -1,0 +1,24 @@
+<%- include('partials/page-start', { title: title, user: user }) %>
+<main class="site-main">
+  <h1 class="page-title">Subscriptions</h1>
+  <% if (!channels.length) { %>
+    <p class="empty-state">You are not subscribed to any channel yet. Open a video and press «Subscribe» next to the channel name.</p>
+  <% } else { %>
+    <ul class="sub-channels" aria-label="Your channels">
+      <% channels.forEach(function (ch) { %>
+        <li><a href="/channel/<%= ch._id %>" class="sub-channel">
+          <span class="ch-avatar ch-avatar-sm" aria-hidden="true"><% if (ch.avatarUrl) { %><img src="<%= ch.avatarUrl %>" alt="" /><% } else { %><%= (ch.username || '?').trim().charAt(0).toUpperCase() %><% } %></span>
+          <span><%= ch.username %></span>
+        </a></li>
+      <% }) %>
+    </ul>
+    <h2 class="page-title">Latest from your channels</h2>
+    <% if (videos.length) { %>
+      <div class="vgrid"><% videos.forEach(function (video) { %><%- include('partials/video-card', { video: video }) %><% }) %></div>
+    <% } else { %>
+      <p class="empty-state">No videos from your channels yet.</p>
+    <% } %>
+  <% } %>
+</main>
+</body>
+</html>

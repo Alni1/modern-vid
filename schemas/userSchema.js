@@ -8,7 +8,7 @@ const Schema = mongoose.Schema;
 let userSchema = new mongoose.Schema({
   uuid: { type: String, unique: true }, 
   login: { type: String, required: true, unique: true, trim: true, lowercase: true },
-  password: { type: String, required: true, minlength: 6, trim: true }, 
+  password: { type: String, required: true, minlength: 8, trim: true }, 
   username: { type: String, required: true },
   timestamp: { type: Date }, 
 
@@ -46,7 +46,7 @@ userSchema.pre("save", async function (next) {
     if (user.password && user.password.length >= 6) {
         debug('[USER_SCHEMA_PRE_SAVE] Hashing password for user:', user.login);
         user.password = await bcrypt.hash(user.password, 10);
-    } else if (user.isNew && (!user.password || user.password.length < 6)) {
+    } else if (user.isNew && (!user.password || user.password.length < 8)) {
 
         debug('[USER_SCHEMA_PRE_SAVE] Password for new user does not meet length requirement, will let schema validation handle it.');
     }

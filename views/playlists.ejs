@@ -1,0 +1,21 @@
+<%- include('partials/page-start', { title: title, user: user }) %>
+<main class="site-main">
+  <div class="pl-top">
+    <h1 class="page-title">Playlists</h1>
+    <form class="pl-create" id="plCreate">
+      <input type="text" name="title" maxlength="100" required placeholder="New playlist name" aria-label="New playlist name" />
+      <select name="visibility" aria-label="Visibility">
+        <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
+      </select>
+      <button type="submit" class="ch-btn ch-sub">Create</button>
+    </form>
+  </div>
+  <p class="pl-error" id="plError" role="alert" hidden></p>
+  <% if (playlists.length) { %>
+    <div class="vgrid"><% playlists.forEach(function (pl) { %><%- include('partials/playlist-card', { pl: pl }) %><% }) %></div>
+  <% } else { %>
+    <p class="empty-state">No playlists yet. Create one here or press «Save» under a video.</p>
+  <% } %>
+</main>
+</body>
+</html>

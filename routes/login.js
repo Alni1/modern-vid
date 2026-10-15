@@ -6,6 +6,7 @@ const User = require('../schemas/userSchema');
 const rateLimit = require('express-rate-limit');
 
 const { issueSession, safeNext } = require('../utils/auth');
+const { normalizeLogin } = require('../utils/accounts');
 
 // Password guessing protection: at most 10 failed attempts per IP in 15 minutes.
 const loginLimiter = rateLimit({
@@ -28,10 +29,12 @@ router.get('/', function(req, res, next) {
 });
 
 router.post('/', loginLimiter, async function(req, res, next) {
-    const loginData = req.body;
+    // Only strings are accepted: an object such as { "$ne": null } is never passed to a query.
+    const str = (v) => (typeof v === 'string' ? v : '');
+    const loginData = { login: normalizeLogin(str(req.body && req.body.login)), password: str(req.body && req.body.password), next: str(req.body && req.body.next) };
 
     try {
-        const user = await User.findOne({ login: loginData.login });
+        const user = loginData.login && loginData.password ? await User.findOne({ login: loginData.login }) : null;
         // The same message for an unknown login and a wrong password (do not reveal which logins exist).
         const fail = () => res.status(400).render('login', { title: 'Login', error: 'Wrong login or password', loginValue: loginData.login, next: safeNext(loginData.next) });
         if (!user) return fail();

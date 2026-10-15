@@ -95,11 +95,12 @@ video { position: absolute; inset: 0; width: 100%; height: 100%; background: #00
 .mv-btn:focus-visible { box-shadow: inset 0 0 0 2px var(--mv-accent); }
 .mv-btn svg { width: 60%; height: 60%; overflow: visible; }
 .mv-btn.mv-active { color: var(--mv-accent); }
+.mv-btn.mv-dim { opacity: .45; }
 svg .f { fill: currentColor; }
 svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mv-text-btn { width: auto; min-width: var(--mv-size); padding: 0 .6em; font-weight: 600; }
 
-.mv-time { padding: 0 .6em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mv-time { padding: 0 .6em; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 0; max-width: 40cqw; overflow: hidden; text-overflow: ellipsis; }
 .mv-spacer { flex: 1; }
 
 .mv-volume { display: flex; align-items: center; }
@@ -118,6 +119,26 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
 .mv-buffered, .mv-played { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; }
 .mv-buffered { width: var(--mv-buffered, 0%); background: rgba(255,255,255,.4); }
 .mv-played { width: var(--mv-played, 0%); background: var(--mv-accent); }
+/* Chapter boundaries cut small gaps into the bar; the A-B range is highlighted. */
+.mv-marks { position: absolute; inset: 0; pointer-events: none; }
+.mv-mark { position: absolute; top: -1px; bottom: -1px; width: 3px; margin-left: -1.5px; background: rgba(var(--mv-panel-rgb), .9); }
+.mv-loop { position: absolute; top: -2px; bottom: -2px; border-radius: 2px; background: rgba(255,255,255,.35); box-shadow: inset 0 0 0 1px var(--mv-accent); pointer-events: none; }
+.mv-loop-badge { position: absolute; right: 2px; bottom: 2px; font-size: 9px; font-weight: 800; line-height: 1; }
+.mv-btn.mv-loop { position: relative; }
+/* Subtitles drawn by the player with the viewer's style. */
+
+.mv-cc-layer {
+  position: absolute; left: 5%; right: 5%; bottom: calc(var(--mv-size) + 34px); z-index: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; text-align: center;
+  transition: bottom .25s ease;
+  font-size: calc(clamp(14px, 3.4cqw, 34px) * var(--mv-cc-scale, 1));
+}
+:host([data-idle]) .mv-cc-layer { bottom: 6%; }
+.mv-cc-layer[data-position="top"] { bottom: auto; top: 6%; }
+.mv-cue {
+  max-width: 100%; padding: .1em .45em; border-radius: 4px; white-space: pre-line; line-height: 1.35;
+  color: var(--mv-cc-color, #fff); background: var(--mv-cc-bg, rgba(0,0,0,.75)); text-shadow: var(--mv-cc-shadow, none);
+}
 .mv-thumb {
   position: absolute; top: 50%; left: var(--mv-played, 0%); width: 14px; height: 14px; border-radius: 50%;
   background: var(--mv-accent); transform: translate(-50%, -50%) scale(0); transition: transform .1s ease;
@@ -167,11 +188,31 @@ svg .s { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: roun
   font-size: 16px; cursor: pointer; line-height: 1;
 }
 
+.mv-toast {
+  position: absolute; left: 12px; bottom: calc(var(--mv-size) + 44px); z-index: 2;
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; max-width: calc(100% - 24px);
+  background: rgba(0,0,0,.78); border-radius: var(--mv-radius); font-size: 14px;
+}
+.mv-toast button, .mv-next button {
+  border: 0; border-radius: var(--mv-radius); padding: .35em .8em; font: inherit; font-weight: 600; cursor: pointer;
+  background: rgba(255,255,255,.16); color: inherit;
+}
+.mv-toast button:hover, .mv-next button:hover { background: rgba(255,255,255,.26); }
+.mv-next {
+  position: absolute; right: 12px; bottom: calc(var(--mv-size) + 44px); z-index: 3;
+  display: grid; gap: 6px; width: min(320px, calc(100% - 24px)); padding: 12px 14px;
+  background: rgba(0,0,0,.85); border-radius: calc(var(--mv-radius) * 1.5); font-size: 14px;
+}
+.mv-next span { color: rgba(255,255,255,.7); }
+.mv-next strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv-next div { display: flex; justify-content: flex-end; gap: 8px; }
+.mv-next .mv-next-now { background: var(--mv-accent); }
+
 /* Narrow players (phones): smaller buttons; rewind/forward buttons hidden (the arrow keys still work). */
 @container (max-width: 520px) {
   .mv-bar { --mv-size: 36px; gap: 0; }
   .mv-controls { padding: 18px 4px 2px; }
-  .mv-bar [data-control="rewind"], .mv-bar [data-control="forward"], .mv-bar [data-control="spacer"] { display: none; }
+  .mv-bar [data-control="rewind"], .mv-bar [data-control="forward"], .mv-bar [data-control="spacer"], .mv-bar [data-control="loop"] { display: none; }
   .mv-time { padding: 0 .3em; font-size: 12px; }
   .mv-text-btn { padding: 0 .35em; min-width: 30px; }
 }

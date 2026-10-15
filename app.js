@@ -9,6 +9,8 @@ var mongoose = require('mongoose');
 const storage = require('./utils/storage');
 const { startWorker } = require('./utils/transcoder/worker');
 const { migrateLegacyAuth } = require('./utils/auth');
+const { sanitize } = require('./middlewares/sanitize');
+const { privateMedia } = require('./middlewares/privateMedia');
 
 
 
@@ -31,6 +33,8 @@ const analyticsRouter = require('./routes/analytics');
 const reportsRouter = require('./routes/reports');
 const accountRouter = require('./routes/account');
 const moderation = require('./routes/moderation');
+const socialRouter = require('./routes/social');
+const library = require('./routes/library');
 
 
 var usersRouter = require('./routes/users');
@@ -52,10 +56,11 @@ app.set('view engine', 'ejs');
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.use(sanitize); // no MongoDB operators in request data
 app.use(express.static(path.join(__dirname, 'public')));
 // Media files (videos, thumbnails, avatars) from the local storage driver.
 // Registered before the rate limiter: a single video playback issues many range requests.
-if (storage.name === 'local') app.use('/media', storage.middleware());
+if (storage.name === 'local') app.use('/media', privateMedia, storage.middleware());
 app.use(limiter);
 
 app.use('/', indexRouter);
@@ -74,6 +79,8 @@ app.use('/api/reports', reportsRouter); // complaints about videos and comments
 app.use('/api/account', accountRouter); // display name, login and password of the signed-in user
 app.use('/api/moderation', moderation.api); // moderation API (moderators and administrators)
 app.use('/moderation', moderation.page); // moderation panel
+app.use('/api', socialRouter); // likes, subscriptions, playlists, subtitles
+app.use('/', library.router); // channel, subscriptions, playlists pages
 app.use('/logout', logoutRouter);
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -86,9 +93,14 @@ app.use(function(err, req, res, next) {
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  // render the error page
-  res.status(err.status || 500);
+  const status = err.status || 500;
+  if (status >= 500) console.error(err);
+  // API requests get JSON; internal details are not shown to users in production.
+  const message = status >= 500 && req.app.get('env') !== 'development' ? 'Server error' : err.message;
+  res.status(status);
+  if (req.originalUrl.startsWith('/api/')) return res.json({ error: message });
+  res.locals.message = message;
   res.render('error');
 });
 
-module.exports = app; // Export only the app instance
+module.exports = app; // Export only the app instance

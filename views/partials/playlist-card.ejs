@@ -1,0 +1,12 @@
+<%# A playlist tile: cover (first video), number of videos, title and visibility. %>
+<article class="plcard">
+  <a href="/playlist/<%= pl._id %>" class="plcard-thumb" aria-hidden="true" tabindex="-1">
+    <% if (pl.cover) { %><img src="<%= pl.cover %>" alt="" loading="lazy" /><% } else { %><span class="vcard-thumb-empty"></span><% } %>
+    <span class="plcard-count">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h7M16 14v6l5-3z"/></svg>
+      <%= pl.videos.length %> <%= pl.videos.length === 1 ? 'video' : 'videos' %>
+    </span>
+  </a>
+  <h3 class="vcard-title"><a href="/playlist/<%= pl._id %>"><%= pl.title %></a></h3>
+  <p class="vcard-meta"><%= pl.visibility === 'public' ? 'Public' : pl.visibility === 'unlisted' ? 'Unlisted' : 'Private' %> playlist</p>
+</article>

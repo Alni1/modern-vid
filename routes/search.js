@@ -1,6 +1,7 @@
 const express = require('express');
 const VideoMeta = require('../schemas/VideoMeta');
 const _ = require('lodash');
+const { LISTED } = require('../utils/visibility');
 const optionalVerifyToken = require('../middlewares/optionalVerifyToken'); 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ router.get('/', optionalVerifyToken, async (req, res) => {
   const query = req.query.q;
   const category = req.query.category;
 
-  let searchConditions = { status: { $ne: 'processing' }, hiddenAt: null };
+  let searchConditions = { status: { $ne: 'processing' }, hiddenAt: null, ...LISTED };
 
   if (query) {
     searchConditions.$or = [

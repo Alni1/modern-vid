@@ -1,0 +1,71 @@
+<%
+  const plDuration = (s) => {
+    if (!s) return '';
+    s = Math.round(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+    return h ? h + ':' + String(m).padStart(2, '0') + ':' + sec : m + ':' + sec;
+  };
+  const visText = { public: 'Public', unlisted: 'Unlisted', private: 'Private' };
+%>
+<%- include('partials/page-start', { title: title, user: user }) %>
+<main class="site-main pl-page" data-playlist="<%= playlist._id %>">
+  <section class="pl-info">
+    <div class="pl-cover">
+      <% if (videos[0] && videos[0].thumbnailUrl) { %><img src="<%= videos[0].thumbnailUrl %>" alt="" /><% } else { %><span class="vcard-thumb-empty"></span><% } %>
+    </div>
+    <div>
+      <h1 class="page-title" id="plTitle"><%= playlist.title %></h1>
+      <p class="page-sub">
+        <% if (playlist.owner) { %><a href="/channel/<%= playlist.owner._id %>"><%= playlist.owner.username %></a> · <% } %>
+        <%= videos.length %> <%= videos.length === 1 ? 'video' : 'videos' %> · <%= visText[playlist.visibility] %>
+      </p>
+      <% if (playlist.description) { %><p class="pl-desc"><%= playlist.description %></p><% } %>
+      <div class="pl-actions">
+        <% if (videos.length) { %><a class="ch-btn ch-sub" href="/player/<%= videos[0]._id %>?list=<%= playlist._id %>">Play all</a><% } %>
+        <button type="button" class="ch-btn" data-copy-link>Copy link</button>
+      </div>
+      <% if (own) { %>
+        <form class="pl-edit" id="plEdit">
+          <input type="text" name="title" maxlength="100" required value="<%= playlist.title %>" aria-label="Playlist name" />
+          <select name="visibility" aria-label="Visibility">
+            <% ['private', 'unlisted', 'public'].forEach(function (v) { %><option value="<%= v %>"<%= playlist.visibility === v ? ' selected' : '' %>><%= visText[v] %></option><% }) %>
+          </select>
+          <button type="submit" class="ch-btn">Save</button>
+          <button type="button" class="ch-btn ch-danger" id="plDelete">Delete playlist</button>
+        </form>
+        <p class="pl-error" id="plError" role="alert" hidden></p>
+      <% } %>
+    </div>
+  </section>
+
+  <% if (videos.length) { %>
+    <ol class="pl-list">
+      <% videos.forEach(function (v, i) { %>
+        <li class="pl-row" data-video="<%= v._id %>">
+          <span class="pl-num"><%= i + 1 %></span>
+          <a href="/player/<%= v._id %>?list=<%= playlist._id %>" class="next-item">
+            <span class="next-thumb">
+              <% if (v.thumbnailUrl) { %><img src="<%= v.thumbnailUrl %>" alt="" loading="lazy" /><% } %>
+              <% if (plDuration(v.duration)) { %><span class="vcard-duration"><%= plDuration(v.duration) %></span><% } %>
+            </span>
+            <span class="next-text">
+              <span class="next-title"><%= v.title || 'Untitled' %></span>
+              <span class="next-meta"><%= v.user && v.user.username ? v.user.username : 'Unknown' %></span>
+            </span>
+          </a>
+          <% if (own) { %>
+            <span class="pl-row-actions">
+              <button type="button" class="pl-icon" data-move="up" title="Move up" aria-label="Move up"<%= i === 0 ? ' disabled' : '' %>>↑</button>
+              <button type="button" class="pl-icon" data-move="down" title="Move down" aria-label="Move down"<%= i === videos.length - 1 ? ' disabled' : '' %>>↓</button>
+              <button type="button" class="pl-icon" data-remove title="Remove from playlist" aria-label="Remove from playlist">✕</button>
+            </span>
+          <% } %>
+        </li>
+      <% }) %>
+    </ol>
+  <% } else { %>
+    <p class="empty-state">This playlist is empty. Press «Save» under a video to add it.</p>
+  <% } %>
+</main>
+</body>
+</html>

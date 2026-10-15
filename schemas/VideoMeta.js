@@ -29,6 +29,14 @@ const videoMetaSchema = new mongoose.Schema({
   hiddenAt: { type: Date, default: null },
   hiddenReason: { type: String, default: '' },
   thumbnailUrl: { type: String },
+  // Who can find and open the video: public, unlisted (by link only) or private (author only).
+  visibility: { type: String, enum: ['public', 'unlisted', 'private'], default: 'public' },
+  // Number of likes (the likes themselves are in the Like collection).
+  likes: { type: Number, default: 0 },
+  // Chapters set by the author: start time (s) and title, sorted by time.
+  chapters: [{ _id: false, start: Number, title: String }],
+  // Subtitle tracks (WebVTT files in the storage), one per language.
+  subtitles: [{ _id: false, lang: String, label: String, key: String }],
   category: {
     type: String,
     enum: ['Education', 'Entertainment'],
@@ -39,4 +47,4 @@ const videoMetaSchema = new mongoose.Schema({
   collection: 'videoMeta'
 });
 
-module.exports = mongoose.model('VideoMeta', videoMetaSchema);
+module.exports = mongoose.model('VideoMeta', videoMetaSchema);

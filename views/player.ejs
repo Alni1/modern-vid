@@ -55,6 +55,10 @@
                    <% if (hlsUrl) { %>fallback-src="<%= progressiveUrl %>"<% } %>
                    <% if (video.thumbnailUrl) { %>poster="<%= video.thumbnailUrl %>"<% } %>
                    <% if (thumbnailsUrl) { %>thumbnails="<%= thumbnailsUrl %>"<% } %>
+                   resume-key="<%= video._id %>"
+                   <% if (nextVideo) { %>next-url="<%= nextVideo.url %>" next-title="<%= nextVideo.title || 'Untitled' %>"<% } %>
+                   <% if (subtitles.length) { %>subtitles="<%= JSON.stringify(subtitles) %>"<% } %>
+                   <% if (chapters.length) { %>chapters="<%= JSON.stringify(chapters.map(function (c) { return { start: c.start, title: c.title }; })) %>"<% } %>
                    <% if (authorTheme) { %>author-theme="<%= JSON.stringify(authorTheme) %>"<% } %>
                    <% if (viewerPreset) { %>preset="<%= JSON.stringify(viewerPreset) %>"<% } %>></mv-player>
         <% if (hlsUrl && video.processingProgress !== undefined && video.processingProgress < 1) { %>
@@ -78,11 +82,22 @@
             <% if (owner && owner.avatarUrl) { %><img src="<%= owner.avatarUrl %>" alt="" /><% } else { %><%= initial(owner && owner.username) %><% } %>
           </span>
           <div>
-            <p class="watch-channel-name"><%= owner ? owner.username : 'Unknown' %></p>
-            <p class="watch-channel-sub"><%= channelVideos %> <%= channelVideos === 1 ? 'video' : 'videos' %></p>
+            <p class="watch-channel-name"><% if (owner) { %><a href="/channel/<%= owner._id %>"><%= owner.username %></a><% } else { %>Unknown<% } %></p>
+            <p class="watch-channel-sub"><span data-subscribers="<%= owner ? owner._id : '' %>"><%= subscribers %></span> <%= subscribers === 1 ? 'subscriber' : 'subscribers' %> · <%= channelVideos %> <%= channelVideos === 1 ? 'video' : 'videos' %></p>
           </div>
+          <% if (owner && me !== String(owner._id)) { %>
+            <button type="button" class="ch-btn ch-sub<%= subscribed ? ' is-on' : '' %>" data-subscribe="<%= owner._id %>" aria-pressed="<%= subscribed %>"><%= subscribed ? 'Subscribed' : 'Subscribe' %></button>
+          <% } %>
         </div>
         <div class="watch-actions">
+          <button type="button" class="watch-pill<%= liked ? ' is-on' : '' %>" data-like="<%= video._id %>" aria-pressed="<%= liked %>" title="I like this">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11v9H4v-9zM7 11l4-7a2 2 0 0 1 3 2l-1 4h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 16.8 20H7"/></svg>
+            <span data-likes><%= compact(video.likes || 0) %></span>
+          </button>
+          <button type="button" class="watch-pill" data-save="<%= video._id %>">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h12M4 11h12M4 16h7M18 13v8M14 17h8"/></svg>
+            Save
+          </button>
           <button type="button" class="watch-pill" id="shareBtn">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
             Copy link
@@ -106,6 +121,14 @@
           <button type="button" class="watch-more" id="descMore" hidden>Show more</button>
         <% } else { %>
           <p class="watch-desc-text watch-muted">No description.</p>
+        <% } %>
+        <% if (chapters.length) { %>
+          <h3 class="watch-chapters-title">Chapters</h3>
+          <ol class="watch-chapters">
+            <% chapters.forEach(function (c) { %>
+              <li><button type="button" data-seek="<%= c.start %>"><span class="watch-chapter-time"><%= c.time %></span> <%= c.title %></button></li>
+            <% }) %>
+          </ol>
         <% } %>
       </section>
 
@@ -138,12 +161,12 @@
                const canDelete = me && (me === cuId || me === ownerId || isModerator);
                const canReport = me && cuId && me !== cuId; %>
             <li class="comment<%= comment.hiddenAt ? ' is-hidden' : '' %>" data-id="<%= comment._id %>">
-              <span class="watch-avatar watch-avatar-sm" aria-hidden="true">
+              <<%= cuId ? 'a href=/channel/' + cuId + ' tabindex=-1' : 'span' %> class="watch-avatar watch-avatar-sm" aria-hidden="true">
                 <% if (cu && cu.avatarUrl) { %><img src="<%= cu.avatarUrl %>" alt="" /><% } else { %><%= initial(cu && cu.username) %><% } %>
-              </span>
+              </<%= cuId ? 'a' : 'span' %>>
               <div class="comment-body">
                 <p class="comment-head">
-                  <strong class="comment-name<%= cuId && cuId === ownerId ? ' is-author' : '' %>"><%= cu ? cu.username : 'Deleted user' %></strong>
+                  <% if (cuId) { %><a href="/channel/<%= cuId %>" class="comment-name<%= cuId === ownerId ? ' is-author' : '' %>"><%= cu.username %></a><% } else { %><strong class="comment-name">Deleted user</strong><% } %>
                   <% if (cuId && cuId === ownerId) { %><span class="comment-badge">Author</span><% } %>
                   <time datetime="<%= comment.createdAt ? new Date(comment.createdAt).toISOString() : '' %>" title="<%= fullDate(comment.createdAt) %>"><%= ago(comment.createdAt) %></time>
                 </p>
@@ -169,6 +192,25 @@
     </div>
 
     <aside class="watch-side" aria-label="Up next">
+      <% if (playlist) { %>
+        <section class="watch-playlist" aria-labelledby="plSideTitle">
+          <div class="watch-playlist-head">
+            <h2 id="plSideTitle"><a href="/playlist/<%= playlist.id %>"><%= playlist.title %></a></h2>
+            <p class="watch-muted"><%= playlist.owner ? playlist.owner.username + ' · ' : '' %><%= playlist.index + 1 %> / <%= playlist.items.length %></p>
+          </div>
+          <ol class="watch-playlist-list">
+            <% playlist.items.forEach(function (item, i) { %>
+              <li<%= i === playlist.index ? ' class=is-current aria-current=true' : '' %>>
+                <a href="/player/<%= item._id %>?list=<%= playlist.id %>" class="next-item">
+                  <span class="pl-num"><%= i === playlist.index ? '▶' : i + 1 %></span>
+                  <span class="next-thumb"><% if (item.thumbnailUrl) { %><img src="<%= item.thumbnailUrl %>" alt="" loading="lazy" /><% } %></span>
+                  <span class="next-text"><span class="next-title"><%= item.title || 'Untitled' %></span><span class="next-meta"><%= item.user && item.user.username ? item.user.username : '' %></span></span>
+                </a>
+              </li>
+            <% }) %>
+          </ol>
+        </section>
+      <% } %>
       <h2>Up next</h2>
       <% if (recommendedVideos && recommendedVideos.length) { %>
         <ul class="next-list">

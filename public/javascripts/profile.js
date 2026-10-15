@@ -187,14 +187,87 @@
     const f = fileInput.files[0];
     drop.classList.toggle('pf-drop-filled', Boolean(f));
     $('#dropText').textContent = f ? f.name : 'Drop a video here or click to choose';
-    $('#dropHint').textContent = f ? formatSize(f.size) + ' · click to choose another file' : 'MP4, WebM, MOV… up to 1 GB';
+    $('#dropHint').textContent = f ? formatSize(f.size) + ' · click to choose another file' : $('#dropHint').dataset.default;
     const title = $('#modalTitle');
     if (f && !title.value) title.value = f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
   };
 
+  // The same dialog edits a published video (without a file): editId is the video being edited.
+  let editId = null;
+  const subsField = $('#subsField');
+  const subsList = $('#subsList');
+  const subsStatus = $('#subsStatus');
+  const renderSubs = (subs) => {
+    subsList.replaceChildren(...subs.map((s) => {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = `${s.label} (${s.lang})`;
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'pf-icon-btn';
+      del.textContent = '✕';
+      del.title = 'Delete subtitles';
+      del.setAttribute('aria-label', `Delete subtitles ${s.label}`);
+      del.addEventListener('click', async () => {
+        const r = await fetch(`/api/videos/${editId}/subtitles/${s.lang}`, { method: 'DELETE', headers: { Accept: 'application/json' } });
+        const body = await r.json().catch(() => ({}));
+        if (r.ok) renderSubs(body.subtitles);
+        else subsStatus.textContent = body.error || 'Could not delete the subtitles';
+      });
+      li.append(name, del);
+      return li;
+    }));
+    if (!subs.length) subsList.innerHTML = '<li class="pf-muted">No subtitles yet.</li>';
+  };
+  $('#subsUpload').addEventListener('click', async () => {
+    const file = $('#subsFile').files[0];
+    if (!file) return (subsStatus.textContent = 'Choose a .vtt or .srt file');
+    const data = new FormData();
+    data.append('lang', $('#subsLang').value);
+    data.append('label', $('#subsLang').selectedOptions[0].textContent);
+    data.append('file', file);
+    subsStatus.textContent = 'Uploading…';
+    const r = await fetch(`/api/videos/${editId}/subtitles`, { method: 'POST', headers: { Accept: 'application/json' }, body: data });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) return (subsStatus.textContent = body.error || 'Upload failed');
+    $('#subsFile').value = '';
+    subsStatus.textContent = `Added: ${body.cues} subtitles`;
+    renderSubs(body.subtitles);
+  });
+
+  const setMode = (video) => {
+    editId = video ? video.id : null;
+    subsField.hidden = !video;
+    subsStatus.textContent = '';
+    if (video) renderSubs(video.subtitles || []);
+    drop.hidden = Boolean(video);
+    fileInput.required = !video;
+    $('#uploadTitle').textContent = video ? 'Edit video' : 'Upload video';
+    submitBtn.textContent = video ? 'Save' : 'Upload';
+  };
+
+  $$('[data-edit-video]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const video = JSON.parse(b.closest('.pf-card').dataset.video);
+      form.reset();
+      setMode(video);
+      $('#modalTitle').value = video.title;
+      $('#modalDescription').value = video.description;
+      $('#modalTags').value = video.tags;
+      $('#modalChapters').value = video.chapters || '';
+      form.querySelector(`input[name="category"][value="${video.category}"]`).checked = true;
+      form.querySelector(`input[name="visibility"][value="${video.visibility}"]`).checked = true;
+      progress.hidden = true;
+      uploadStatus.textContent = '';
+      submitBtn.disabled = false;
+      dialog.showModal();
+    }),
+  );
+
   $$('[data-open-upload]').forEach((b) =>
     b.addEventListener('click', () => {
       form.reset();
+      setMode(null);
       showFile();
       progress.hidden = true;
       uploadStatus.textContent = '';
@@ -234,8 +307,30 @@
     showFile();
   });
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (editId) {
+      submitBtn.disabled = true;
+      uploadStatus.textContent = 'Saving…';
+      const data = Object.fromEntries(new FormData(form));
+      delete data.video;
+      delete data.subsFile;
+      try {
+        const r = await fetch(`/userprofile/video/${editId}/edit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || 'Could not save the changes');
+        uploadStatus.textContent = 'Saved';
+        setTimeout(() => location.reload(), 400);
+      } catch (err) {
+        uploadStatus.textContent = err.message;
+        submitBtn.disabled = false;
+      }
+      return;
+    }
     if (!fileInput.files.length) return notify('Choose a video file first');
     submitBtn.disabled = true;
     progress.hidden = false;
@@ -244,11 +339,14 @@
     xhr = new XMLHttpRequest();
     xhr.open('POST', '/upload', true);
     xhr.setRequestHeader('Accept', 'application/json');
+    const started = performance.now();
     xhr.upload.onprogress = (ev) => {
       if (!ev.lengthComputable) return;
       const p = Math.round((ev.loaded / ev.total) * 100);
+      const seconds = (performance.now() - started) / 1000;
+      const speed = seconds > 0.5 ? ` · ${(ev.loaded / seconds / 1e6).toFixed(1)} MB/s` : '';
       bar.style.width = p + '%';
-      percent.textContent = p + '%';
+      percent.textContent = p + '%' + speed;
       if (p === 100) uploadStatus.textContent = 'Checking the file…';
     };
     xhr.onload = () => {

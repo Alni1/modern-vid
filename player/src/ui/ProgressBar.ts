@@ -1,6 +1,7 @@
 import type { PlayerCore, PlaybackState } from '../core/PlayerCore';
 import { formatTime } from './format';
 import { cueAt, parseThumbsVtt, type ThumbCue } from './thumbnails';
+import { chapterIndexAt, type Chapter } from './chapters';
 
 /** Seek bar with buffered range, hover tooltip with a preview frame, and pointer dragging. */
 export class ProgressBar {
@@ -15,6 +16,10 @@ export class ProgressBar {
   private thumbsUrl: string | null = null;
   private thumbs: ThumbCue[] | null = null;
   private thumbsLoading: Promise<void> | null = null;
+  private chapters: Chapter[] = [];
+  private marks: HTMLDivElement;
+  private loopEl: HTMLDivElement;
+  private loop: { a: number | null; b: number | null } = { a: null, b: null };
 
   constructor(private core: PlayerCore) {
     this.el = document.createElement('div');
@@ -23,7 +28,7 @@ export class ProgressBar {
     this.el.setAttribute('aria-label', 'Seek');
     this.el.tabIndex = 0;
     this.el.innerHTML =
-      '<div class="mv-track"><div class="mv-buffered"></div><div class="mv-played"></div>' +
+      '<div class="mv-track"><div class="mv-buffered"></div><div class="mv-played"></div><div class="mv-loop" hidden></div><div class="mv-marks"></div>' +
       '<div class="mv-thumb"></div></div><div class="mv-tooltip" hidden></div>' +
       '<div class="mv-preview" hidden aria-hidden="true"><div class="mv-preview-frame"><div class="mv-preview-img"></div></div>' +
       '<div class="mv-preview-time"></div></div>';
@@ -32,6 +37,8 @@ export class ProgressBar {
     this.preview_ = this.el.querySelector('.mv-preview') as HTMLDivElement;
     this.previewImg = this.el.querySelector('.mv-preview-img') as HTMLDivElement;
     this.previewTime = this.el.querySelector('.mv-preview-time') as HTMLDivElement;
+    this.marks = this.el.querySelector('.mv-marks') as HTMLDivElement;
+    this.loopEl = this.el.querySelector('.mv-loop') as HTMLDivElement;
 
     this.el.addEventListener('pointerdown', this.onDown);
     this.el.addEventListener('pointermove', this.onHover);
@@ -46,6 +53,43 @@ export class ProgressBar {
     this.thumbsUrl = url;
     this.thumbs = null;
     this.thumbsLoading = null;
+  }
+
+  /** Chapters: gaps on the bar and the chapter title in the hover tooltip. */
+  setChapters(chapters: Chapter[]): void {
+    this.chapters = chapters;
+    this.renderMarks();
+  }
+
+  /** A-B repeat range shown on the bar (null = not set). */
+  setLoop(a: number | null, b: number | null): void {
+    this.loop = { a, b };
+    this.renderLoop();
+  }
+
+  private renderMarks(): void {
+    const d = this.duration;
+    this.marks.replaceChildren(...(d ? this.chapters.filter((c) => c.start > 0 && c.start < d) : []).map((c) => {
+      const m = document.createElement('div');
+      m.className = 'mv-mark';
+      m.style.left = `${(c.start / d) * 100}%`;
+      return m;
+    }));
+  }
+
+  private renderLoop(): void {
+    const { a, b } = this.loop;
+    const d = this.duration;
+    this.loopEl.hidden = a === null || !d;
+    if (a === null || !d) return;
+    const end = b ?? a;
+    this.loopEl.style.left = `${(a / d) * 100}%`;
+    this.loopEl.style.width = `${Math.max(0.4, ((end - a) / d) * 100)}%`;
+  }
+
+  private label(time: number): string {
+    const i = chapterIndexAt(this.chapters, time);
+    return i >= 0 ? `${this.chapters[i].title} · ${formatTime(time)}` : formatTime(time);
   }
 
   private loadThumbs(): void {
@@ -77,7 +121,7 @@ export class ProgressBar {
     if (!cue) {
       this.preview_.hidden = true;
       this.tooltip.hidden = false;
-      this.tooltip.textContent = formatTime(time);
+      this.tooltip.textContent = this.label(time);
       this.tooltip.style.left = `${ratio * 100}%`;
       return;
     }
@@ -97,7 +141,7 @@ export class ProgressBar {
     img.backgroundImage = `url("${cue.url}")`;
     img.backgroundPosition = `-${cue.x}px -${cue.y}px`;
     img.transform = `scale(${scale})`;
-    this.previewTime.textContent = formatTime(time);
+    this.previewTime.textContent = this.label(time);
     // Keep the preview inside the bar.
     const half = width / 2;
     const x = Math.min(trackWidth - half, Math.max(half, ratio * trackWidth));
@@ -132,7 +176,11 @@ export class ProgressBar {
   }
 
   update(s: PlaybackState): void {
-    this.duration = s.duration;
+    if (s.duration !== this.duration) {
+      this.duration = s.duration;
+      this.renderMarks();
+      this.renderLoop();
+    }
     const d = s.duration || 1;
     if (!this.dragging) this.el.style.setProperty('--mv-played', `${(s.currentTime / d) * 100}%`);
     this.el.style.setProperty('--mv-buffered', `${(s.bufferedEnd / d) * 100}%`);

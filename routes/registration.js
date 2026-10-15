@@ -37,10 +37,10 @@ router.post('/', registrationLimiter, async function(req, res, next){
         });
     }
 
-    if (!password || password.length < 6) {
+    if (!password || password.length < 8) {
         return res.status(400).render('registration', {
             title: "Registration",
-            error: "Password must be at least 6 characters long.",
+            error: "Password must be at least 8 characters long.",
             
             loginValue: login,
             usernameValue: username
@@ -89,4 +89,4 @@ router.post('/', registrationLimiter, async function(req, res, next){
     }
 })
 
-module.exports = router;
+module.exports = router;

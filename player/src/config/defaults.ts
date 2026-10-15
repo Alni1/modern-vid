@@ -20,6 +20,9 @@ export const CONTROL_NAMES: Record<ControlId, string> = {
   quality: 'Quality',
   settings: 'Settings',
   pip: 'Picture in picture',
+  theater: 'Theater mode',
+  captions: 'Subtitles',
+  loop: 'A-B repeat',
   fullscreen: 'Full screen',
 };
 
@@ -35,6 +38,9 @@ export const HOTKEY_NAMES: Record<HotkeyAction, string> = {
   speedDown: 'Slower',
   toggleStats: 'Statistics',
   toggleSettings: 'Settings panel',
+  toggleTheater: 'Theater mode',
+  toggleCaptions: 'Subtitles on / off',
+  abLoop: 'A-B repeat',
 };
 
 /** System-level defaults: the lowest level of the preset hierarchy. */
@@ -50,7 +56,7 @@ export const DEFAULT_CONFIG: PlayerConfig = {
   },
   layout: {
     left: ['play', 'rewind', 'forward', 'volume', 'time'],
-    right: ['speed', 'quality', 'settings', 'pip', 'fullscreen'],
+    right: ['loop', 'captions', 'speed', 'quality', 'settings', 'theater', 'pip', 'fullscreen'],
     autoHide: true,
     autoHideDelay: 2500,
     centerPlay: true,
@@ -62,6 +68,8 @@ export const DEFAULT_CONFIG: PlayerConfig = {
     seekStep: 10,
     speeds: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3],
     useAuthorTheme: true,
+    resume: true,
+    autoplayNext: true,
   },
   quality: {
     algorithm: 'adaptive',
@@ -80,5 +88,17 @@ export const DEFAULT_CONFIG: PlayerConfig = {
     speedDown: ['<'],
     toggleStats: ['i'],
     toggleSettings: ['s'],
+    toggleTheater: ['t'],
+    toggleCaptions: ['c'],
+    abLoop: ['b'],
+  },
+  subtitles: {
+    lang: null,
+    size: 'normal',
+    color: '#ffffff',
+    background: '#000000',
+    backgroundOpacity: 0.75,
+    position: 'bottom',
+    edge: 'none',
   },
 };

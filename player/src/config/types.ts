@@ -9,6 +9,9 @@ export type ControlId =
   | 'speed'
   | 'quality'
   | 'pip'
+  | 'theater'
+  | 'captions'
+  | 'loop'
   | 'settings'
   | 'fullscreen';
 
@@ -49,6 +52,10 @@ export interface BehaviorConfig {
   speeds: number[];
   /** Apply the channel author's theme (false = always use the viewer's own appearance). */
   useAuthorTheme: boolean;
+  /** Continue a video from the position where the viewer stopped watching it. */
+  resume: boolean;
+  /** When a video ends, play the next recommended one after a short countdown. */
+  autoplayNext: boolean;
 }
 
 export type AbrAlgorithmName = 'adaptive' | 'hybrid' | 'throughput' | 'buffer';
@@ -76,10 +83,26 @@ export type HotkeyAction =
   | 'speedUp'
   | 'speedDown'
   | 'toggleStats'
-  | 'toggleSettings';
+  | 'toggleSettings'
+  | 'toggleTheater'
+  | 'toggleCaptions'
+  | 'abLoop';
 
 /** action -> list of KeyboardEvent.key values (case-insensitive). */
 export type HotkeysConfig = Record<HotkeyAction, string[]>;
+
+/** Subtitles: the chosen language and how the text is drawn (the player renders cues itself). */
+export interface SubtitlesConfig {
+  /** Language of the subtitles to show (null = off). */
+  lang: string | null;
+  size: 'small' | 'normal' | 'large' | 'xlarge';
+  color: string;
+  background: string;
+  /** Opacity of the text background, 0..1. */
+  backgroundOpacity: number;
+  position: 'bottom' | 'top';
+  edge: 'none' | 'outline' | 'shadow';
+}
 
 export interface PlayerConfig {
   theme: ThemeConfig;
@@ -87,6 +110,7 @@ export interface PlayerConfig {
   behavior: BehaviorConfig;
   quality: QualityConfig;
   hotkeys: HotkeysConfig;
+  subtitles: SubtitlesConfig;
 }
 
 export type DeepPartial<T> = {

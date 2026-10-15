@@ -11,11 +11,24 @@ const { requireActiveUser } = require('../middlewares/roles');
 const storage = require('../utils/storage');
 const { probe, makeThumbnail } = require('../utils/ffmpeg');
 const { enqueue } = require('../utils/transcoder/worker');
+const rateLimit = require('express-rate-limit');
+const { MAX_UPLOAD_BYTES, maxUploadText } = require('../utils/limits');
+const { VISIBILITY } = require('../utils/visibility');
+const { parseChapters } = require('../utils/chapters');
 
 const router = express.Router();
 
 const TEMP_DIR = path.join(__dirname, '../temp_uploads');
-const MAX_SIZE = 1 * 1024 * 1024 * 1024; // 1 GB (direct multipart upload to storage comes later)
+const MAX_SIZE = MAX_UPLOAD_BYTES; // MAX_UPLOAD_MB in .env, 2 GB by default
+
+/** At most 20 uploads per hour from one address. */
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many uploads. Try again later.' },
+});
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -32,10 +45,10 @@ const upload = multer({
   },
 });
 
-router.post('/', requireActiveUser, (req, res, next) => {
+router.post('/', uploadLimiter, requireActiveUser, (req, res, next) => {
   upload.single('video')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
-      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'File too large. Max size is 1GB.' });
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: `File too large. Max size is ${maxUploadText()}.` });
       return res.status(400).json({ error: `File upload error: ${err.message}` });
     }
     if (err) return res.status(400).json({ error: err.message });
@@ -67,6 +80,12 @@ router.post('/', requireActiveUser, (req, res, next) => {
     const thumbKey = await storage.putFile(`videos/${videoId}/thumb.jpg`, tempThumb, { move: true });
 
     const { title, description, tags, category } = req.body;
+    const visibility = VISIBILITY.includes(req.body.visibility) ? req.body.visibility : 'public';
+    const ch = parseChapters(req.body.chapters, duration);
+    if (ch.error) {
+      await storage.deletePrefix(`videos/${videoId}`).catch(() => {});
+      return res.status(400).json({ error: `Chapters: ${ch.error}` });
+    }
     const newVideo = new VideoMeta({
       videoId,
       title,
@@ -83,6 +102,8 @@ router.post('/', requireActiveUser, (req, res, next) => {
       processingProgress: 0,
       user: req.user._id,
       category,
+      visibility,
+      chapters: ch.chapters,
     });
     await newVideo.save();
     await User.findByIdAndUpdate(req.user._id, { $push: { videos: newVideo._id } });
@@ -98,8 +119,7 @@ router.post('/', requireActiveUser, (req, res, next) => {
   }
 });
 
-router.get('/', verifyToken, (req, res) => {
-  res.render('uploadPage', { user: req.user, query: req.query.q || '' });
-});
+// The upload form is a dialog on the profile page.
+router.get('/', verifyToken, (req, res) => res.redirect('/userprofile#upload'));
 
 module.exports = router;

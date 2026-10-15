@@ -19,4 +19,8 @@ export const icons = {
   exitFullscreen: svg('', 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5'),
   settings: svg('', 'M4 7h9M17 7h3M15 4.5v5M4 17h3M11 17h9M9 14.5v5'),
   pip: svg('M12 12h7v5h-7z', 'M3 5h18v14H3z'),
+  theater: svg('', 'M2 7h20v10H2z'),
+  theaterExit: svg('', 'M5 7h14v10H5z'),
+  captions: svg('', 'M3 6h18v12H3zM10 10.5a2 2 0 1 0 0 3M17 10.5a2 2 0 1 0 0 3'),
+  loop: svg('', 'M17 4l3 3-3 3M4 11V9a2 2 0 0 1 2-2h14M7 20l-3-3 3-3M20 13v2a2 2 0 0 1-2 2H4'),
 };

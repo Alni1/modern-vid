@@ -3,9 +3,9 @@
  * (player/src/config/types.ts): unknown keys and values of a wrong type or range are dropped,
  * so a stored preset can never break the player or inject CSS.
  */
-const CONTROLS = ['play', 'rewind', 'forward', 'volume', 'time', 'spacer', 'speed', 'quality', 'settings', 'pip', 'fullscreen'];
+const CONTROLS = ['play', 'rewind', 'forward', 'volume', 'time', 'spacer', 'speed', 'quality', 'settings', 'pip', 'theater', 'captions', 'loop', 'fullscreen'];
 const ACTIONS = ['togglePlay', 'seekBack', 'seekForward', 'volumeUp', 'volumeDown', 'toggleMute', 'toggleFullscreen',
-  'speedUp', 'speedDown', 'toggleStats', 'toggleSettings'];
+  'speedUp', 'speedDown', 'toggleStats', 'toggleSettings', 'toggleTheater', 'toggleCaptions', 'abLoop'];
 
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const color = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : undefined);
@@ -30,9 +30,15 @@ const SCHEMA = {
   layout: { left: controlList, right: controlList, autoHide: bool, autoHideDelay: num(500, 20000), centerPlay: bool },
   behavior: {
     autoplay: bool, rememberVolume: bool, rememberSpeed: bool, seekStep: num(1, 120), speeds, useAuthorTheme: bool,
+    resume: bool, autoplayNext: bool,
   },
   quality: { algorithm: oneOf('adaptive', 'hybrid', 'throughput', 'buffer'), mode: oneOf('balanced', 'eco', 'stable', 'quality'), maxHeight },
   hotkeys: Object.fromEntries(ACTIONS.map((a) => [a, keyList])),
+  subtitles: {
+    lang: (v) => (v === null || (typeof v === 'string' && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(v)) ? v : undefined),
+    size: oneOf('small', 'normal', 'large', 'xlarge'), color, background: color, backgroundOpacity: num(0, 1),
+    position: oneOf('bottom', 'top'), edge: oneOf('none', 'outline', 'shadow'),
+  },
 };
 
 function clean(value, schema) {

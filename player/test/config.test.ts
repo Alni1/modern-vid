@@ -47,3 +47,13 @@ sprite_000.jpg#xywh=160,0,160,90
   assert.equal(cueAt(cues, 3.5)?.x, 160);
   assert.equal(cueAt(cues, 0)?.x, 0);
 });
+
+test('default hotkeys have no conflicts; theater mode, resume and autoplay of the next video are on by default', () => {
+  assert.deepEqual(findConflicts(DEFAULT_CONFIG.hotkeys), []);
+  assert.ok(DEFAULT_CONFIG.layout.right.includes('theater'));
+  assert.equal(DEFAULT_CONFIG.behavior.resume, true);
+  assert.equal(DEFAULT_CONFIG.behavior.autoplayNext, true);
+  const cfg = resolveConfig(null, { behavior: { resume: false } });
+  assert.equal(cfg.behavior.resume, false);
+  assert.equal(cfg.behavior.autoplayNext, true);
+});

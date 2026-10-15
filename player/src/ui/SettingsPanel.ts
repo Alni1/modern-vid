@@ -19,12 +19,13 @@ export interface SettingsHost {
   onToggle(open: boolean): void;
 }
 
-type TabId = 'appearance' | 'controls' | 'playback' | 'quality' | 'hotkeys' | 'preset';
+type TabId = 'appearance' | 'controls' | 'playback' | 'subtitles' | 'quality' | 'hotkeys' | 'preset';
 
 const TABS: Array<[TabId, string]> = [
   ['appearance', 'Look'],
   ['controls', 'Controls'],
   ['playback', 'Playback'],
+  ['subtitles', 'Subtitles'],
   ['quality', 'Quality'],
   ['hotkeys', 'Keys'],
   ['preset', 'Preset'],
@@ -34,6 +35,7 @@ const TABS: Array<[TabId, string]> = [
 const TAB_GROUP: Partial<Record<TabId, string>> = {
   appearance: 'theme',
   controls: 'layout',
+  subtitles: 'subtitles',
   quality: 'quality',
   hotkeys: 'hotkeys',
 };
@@ -176,6 +178,7 @@ export class SettingsPanel {
       case 'appearance': return this.appearanceTab();
       case 'controls': return this.controlsTab();
       case 'playback': return this.playbackTab();
+      case 'subtitles': return this.subtitlesTab();
       case 'quality': return this.qualityTab();
       case 'hotkeys': return this.hotkeysTab();
       default: return this.presetTab();
@@ -243,7 +246,22 @@ export class SettingsPanel {
       this.switchRow('Autoplay', ['behavior', 'autoplay'], b.autoplay),
       this.switchRow('Remember volume', ['behavior', 'rememberVolume'], b.rememberVolume),
       this.switchRow('Remember speed', ['behavior', 'rememberSpeed'], b.rememberSpeed),
+      this.switchRow('Continue where I left off', ['behavior', 'resume'], b.resume),
+      this.switchRow('Autoplay next video', ['behavior', 'autoplayNext'], b.autoplayNext),
       this.select('Seek step', ['behavior', 'seekStep'], b.seekStep, [[5, '5 s'], [10, '10 s'], [15, '15 s'], [30, '30 s']]),
+    ];
+  }
+
+  private subtitlesTab(): HTMLElement[] {
+    const s = this.host.config().subtitles;
+    return [
+      el('p', 'mv-s-hint', 'Subtitles are turned on with the CC button or the C key when the video has them. The style below is used for every video.'),
+      this.select('Text size', ['subtitles', 'size'], s.size, [['small', 'Small'], ['normal', 'Normal'], ['large', 'Large'], ['xlarge', 'Extra large']]),
+      this.color('Text color', ['subtitles', 'color'], s.color, ['#ffffff', '#ffd84d', '#00e5ff', '#7dff7a', '#000000']),
+      this.color('Background', ['subtitles', 'background'], s.background, ['#000000', '#1b1f2a', '#ffffff', '#0b2540']),
+      this.range('Background opacity', ['subtitles', 'backgroundOpacity'], s.backgroundOpacity, 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
+      this.select('Edge', ['subtitles', 'edge'], s.edge, [['none', 'None'], ['outline', 'Outline'], ['shadow', 'Drop shadow']]),
+      this.select('Position', ['subtitles', 'position'], s.position, [['bottom', 'Bottom'], ['top', 'Top']]),
     ];
   }
 

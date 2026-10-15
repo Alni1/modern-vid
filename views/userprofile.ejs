@@ -127,7 +127,8 @@
         <ul class="pf-grid" id="videoGrid">
           <% videos.slice().reverse().forEach(function (video) { %>
             <li class="pf-card" data-title="<%= (video.title || '').toLowerCase() %>"
-                data-date="<%= new Date(video.uploadedAt).getTime() %>" data-views="<%= video.views || 0 %>">
+                data-date="<%= new Date(video.uploadedAt).getTime() %>" data-views="<%= video.views || 0 %>"
+                data-video="<%= JSON.stringify({ id: video._id, title: video.title || '', description: video.description || '', tags: (video.tags || []).join(', '), category: video.category || 'Education', visibility: video.visibility || 'public', chapters: chaptersToText(video.chapters), subtitles: (video.subtitles || []).map(function (s) { return { lang: s.lang, label: s.label }; }) }) %>">
               <a href="/player/<%= video._id %>" class="pf-thumb">
                 <% if (video.thumbnailUrl) { %>
                   <img src="<%= video.thumbnailUrl %>" alt="" loading="lazy" />
@@ -147,11 +148,14 @@
               </a>
               <div class="pf-card-body">
                 <a href="/player/<%= video._id %>" class="pf-card-title" title="<%= video.title %>"><%= video.title || 'Untitled' %></a>
-                <p class="pf-card-meta"><%= compact(video.views || 0) %> views · <%= ago(video.uploadedAt) %></p>
+                <p class="pf-card-meta"><%= compact(video.views || 0) %> views · <%= ago(video.uploadedAt) %><% if (video.visibility === 'unlisted') { %> · <span class="pf-vis">Unlisted</span><% } else if (video.visibility === 'private') { %> · <span class="pf-vis">Private</span><% } %></p>
               </div>
               <div class="pf-card-actions">
                 <button type="button" class="pf-icon-btn" data-copy="/player/<%= video._id %>" title="Copy link" aria-label="Copy link to <%= video.title %>">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+                </button>
+                <button type="button" class="pf-icon-btn" data-edit-video title="Edit video" aria-label="Edit <%= video.title %>">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
                 </button>
                 <form method="POST" action="/userprofile/video/delete/<%= video._id %>" data-confirm="Delete “<%= video.title %>”? This cannot be undone.">
                   <button type="submit" class="pf-icon-btn pf-icon-danger" title="Delete video" aria-label="Delete <%= video.title %>">
@@ -303,7 +307,7 @@
                 <label class="pf-field"><span>Current password</span>
                   <input type="password" name="password" required autocomplete="current-password"></label>
                 <label class="pf-field"><span>New password</span>
-                  <input type="password" name="newPassword" minlength="6" required autocomplete="new-password" placeholder="At least 6 characters"></label>
+                  <input type="password" name="newPassword" minlength="8" required autocomplete="new-password" placeholder="At least 8 characters"></label>
                 <p class="pf-edit-hint">Your other devices will be signed out.</p>
                 <p class="pf-edit-error" role="alert" hidden></p>
                 <div class="pf-edit-actions"><button type="button" class="pf-btn pf-btn-ghost" data-cancel>Cancel</button><button type="submit" class="pf-btn pf-btn-primary">Change password</button></div>
@@ -364,7 +368,7 @@
         <input type="file" id="modalVideoFile" name="video" accept="video/*" required class="pf-visually-hidden" />
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>
         <strong id="dropText">Drop a video here or click to choose</strong>
-        <span class="pf-muted" id="dropHint">MP4, WebM, MOV… up to 1 GB</span>
+        <span class="pf-muted" id="dropHint" data-default="MP4, WebM, MOV… up to <%= maxUploadText %>">MP4, WebM, MOV… up to <%= maxUploadText %></span>
       </label>
 
       <label class="pf-field">
@@ -375,12 +379,41 @@
         <span>Description <em class="pf-muted">optional</em></span>
         <textarea id="modalDescription" name="description" rows="3" maxlength="2000" placeholder="Tell viewers about your video"></textarea>
       </label>
+      <label class="pf-field">
+        <span>Chapters <em class="pf-muted">optional, one per line, the first at 0:00</em></span>
+        <textarea id="modalChapters" name="chapters" rows="3" maxlength="6000" placeholder="0:00 Introduction&#10;2:15 Main part&#10;9:40 Summary"></textarea>
+      </label>
+      <label class="pf-field">
+        <span>Tags <em class="pf-muted">comma separated, optional</em></span>
+        <input type="text" id="modalTags" name="tags" maxlength="400" placeholder="lecture, javascript, streaming" />
+      </label>
       <fieldset class="pf-field">
         <legend>Category</legend>
         <div class="pf-segmented">
           <label><input type="radio" name="category" value="Education" checked /><span>Education</span></label>
           <label><input type="radio" name="category" value="Entertainment" /><span>Entertainment</span></label>
         </div>
+      </fieldset>
+      <fieldset class="pf-field">
+        <legend>Visibility</legend>
+        <div class="pf-segmented">
+          <label title="Shown on the home page, in search and recommendations"><input type="radio" name="visibility" value="public" checked /><span>Public</span></label>
+          <label title="Anyone with the link can watch; not listed anywhere"><input type="radio" name="visibility" value="unlisted" /><span>Unlisted</span></label>
+          <label title="Only you can watch"><input type="radio" name="visibility" value="private" /><span>Private</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="pf-field" id="subsField" hidden>
+        <legend>Subtitles <em class="pf-muted">WebVTT (.vtt) or SubRip (.srt)</em></legend>
+        <ul class="pf-subs" id="subsList"></ul>
+        <div class="pf-subs-add">
+          <select id="subsLang" aria-label="Subtitle language">
+            <% Object.keys(subtitleLanguages).forEach(function (code) { %><option value="<%= code %>"><%= subtitleLanguages[code] %></option><% }) %>
+          </select>
+          <input type="file" id="subsFile" accept=".vtt,.srt,text/vtt" aria-label="Subtitle file" />
+          <button type="button" class="pf-btn pf-btn-ghost" id="subsUpload">Add</button>
+        </div>
+        <p class="pf-muted" id="subsStatus" role="status"></p>
       </fieldset>
 
       <div class="pf-progress" id="uploadProgress" hidden>

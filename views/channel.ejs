@@ -1,0 +1,37 @@
+<%- include('partials/page-start', { title: title, user: user }) %>
+<main class="site-main">
+  <section class="ch-head">
+    <span class="ch-avatar" aria-hidden="true">
+      <% if (channel.avatarUrl) { %><img src="<%= channel.avatarUrl %>" alt="" /><% } else { %><%= (channel.username || '?').trim().charAt(0).toUpperCase() %><% } %>
+    </span>
+    <div class="ch-text">
+      <h1 class="page-title"><%= channel.username %></h1>
+      <p class="page-sub">@<%= channel.login %> · <span data-subscribers="<%= channel._id %>"><%= subscribers %></span> <%= subscribers === 1 ? 'subscriber' : 'subscribers' %> · <%= videos.length %> <%= videos.length === 1 ? 'video' : 'videos' %></p>
+    </div>
+    <div class="ch-actions">
+      <% if (own) { %>
+        <a href="/userprofile" class="ch-btn">Manage videos</a>
+      <% } else { %>
+        <button type="button" class="ch-btn ch-sub<%= subscribed ? ' is-on' : '' %>" data-subscribe="<%= channel._id %>" aria-pressed="<%= subscribed %>"><%= subscribed ? 'Subscribed' : 'Subscribe' %></button>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="home-section" aria-labelledby="chVideos">
+    <h2 class="page-title" id="chVideos">Videos</h2>
+    <% if (videos.length) { %>
+      <div class="vgrid"><% videos.forEach(function (video) { %><%- include('partials/video-card', { video: video }) %><% }) %></div>
+    <% } else { %>
+      <p class="empty-state">This channel has no videos yet.</p>
+    <% } %>
+  </section>
+
+  <% if (playlists.length) { %>
+    <section class="home-section" aria-labelledby="chPlaylists">
+      <h2 class="page-title" id="chPlaylists">Playlists</h2>
+      <div class="vgrid"><% playlists.forEach(function (pl) { %><%- include('partials/playlist-card', { pl: pl }) %><% }) %></div>
+    </section>
+  <% } %>
+</main>
+</body>
+</html>

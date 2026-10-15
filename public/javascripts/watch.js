@@ -28,6 +28,15 @@
     setTimeout(poll, 3000);
   }
 
+  // Theater mode: the player switches it, the page widens the layout.
+  const playerEl = $('#my-player');
+  const watchLayout = $('.watch');
+  if (playerEl && watchLayout) {
+    const syncTheater = () => watchLayout.classList.toggle('is-theater', playerEl.hasAttribute('theater'));
+    playerEl.addEventListener('mv-theater', syncTheater);
+    if (window.customElements) customElements.whenDefined('mv-player').then(syncTheater);
+  }
+
   // Player settings of a signed-in viewer are saved on the server (debounced),
   // so they follow the viewer to other browsers and devices.
   const player = $('#my-player');
@@ -263,7 +272,8 @@
     body.className = 'comment-body';
     const head = document.createElement('p');
     head.className = 'comment-head';
-    const name = document.createElement('strong');
+    const name = document.createElement(c.user && c.user._id ? 'a' : 'strong');
+    if (c.user && c.user._id) name.href = `/channel/${c.user._id}`;
     name.className = 'comment-name' + (c.byAuthor ? ' is-author' : '');
     name.textContent = c.user ? c.user.username : 'You';
     head.append(name, ' ');

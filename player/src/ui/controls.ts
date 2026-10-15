@@ -7,7 +7,18 @@ export interface ControlContext {
   core: PlayerCore;
   config: PlayerConfig;
   /** Player-level UI actions available to controls. */
-  ui?: { toggleSettings(): void; settingsOpen(): boolean };
+  ui?: {
+    toggleSettings(): void;
+    settingsOpen(): boolean;
+    toggleTheater?(): void;
+    theaterOn?(): boolean;
+    /** Subtitle tracks of the video and the selected language. */
+    captions?: { tracks(): Array<{ lang: string; label: string }>; current(): string | null; select(lang: string | null): void };
+    /** A-B repeat: the points set so far and the next step (set A, set B, clear). */
+    loop?: { state(): { a: number | null; b: number | null }; cycle(): void };
+    /** Title of the chapter at the given time (null without chapters). */
+    chapterAt?(time: number): string | null;
+  };
 }
 
 export interface Control {
@@ -98,14 +109,15 @@ const volume: ControlFactory = ({ core }) => {
   };
 };
 
-const time: ControlFactory = () => {
+const time: ControlFactory = ({ ui }) => {
   const el = document.createElement('div');
   el.className = 'mv-time';
   el.setAttribute('aria-live', 'off');
   return {
     el,
     update: (s) => {
-      const text = `${formatTime(s.currentTime)} / ${formatTime(s.duration)}`;
+      const chapter = ui?.chapterAt?.(s.currentTime);
+      const text = `${formatTime(s.currentTime)} / ${formatTime(s.duration)}${chapter ? ` · ${chapter}` : ''}`;
       if (el.textContent !== text) el.textContent = text;
     },
   };
@@ -260,6 +272,72 @@ const fullscreen: ControlFactory = ({ core }) => {
   };
 };
 
+/** Subtitles: CC button with a menu of the video's tracks. Hidden when the video has none. */
+const captions: ControlFactory = ({ ui }) => {
+  const m = createMenu('mv-captions', 'Subtitles');
+  m.btn.innerHTML = icons.captions;
+  m.btn.classList.remove('mv-text-btn');
+  return {
+    el: m.el,
+    update: () => {
+      const cc = ui?.captions;
+      const tracks = cc?.tracks() ?? [];
+      // Without subtitle tracks the button stays (the viewer may have placed it) but is dimmed.
+      m.btn.classList.toggle('mv-dim', tracks.length === 0);
+      m.btn.title = tracks.length ? 'Subtitles' : 'This video has no subtitles';
+      if (!cc || !tracks.length) {
+        m.btn.classList.remove('mv-active');
+        m.setItems([{ label: 'No subtitles for this video', checked: false, onSelect: () => undefined }]);
+        return;
+      }
+      const current = cc.current();
+      m.btn.classList.toggle('mv-active', current !== null);
+      m.setItems([
+        { label: 'Off', checked: current === null, onSelect: () => cc.select(null) },
+        ...tracks.map((t) => ({ label: t.label, checked: current === t.lang, onSelect: () => cc.select(t.lang) })),
+      ]);
+    },
+    destroy: m.destroy,
+  };
+};
+
+/** A-B repeat: first press sets A, second sets B (the fragment then repeats), third clears. */
+const loop: ControlFactory = ({ ui }) => {
+  const el = button('mv-loop', 'Repeat from A', icons.loop);
+  const badge = document.createElement('span');
+  badge.className = 'mv-loop-badge';
+  el.append(badge);
+  el.addEventListener('click', () => ui?.loop?.cycle());
+  return {
+    el,
+    update: () => {
+      const st = ui?.loop?.state() ?? { a: null, b: null };
+      const step = st.a === null ? '' : st.b === null ? 'A' : 'A-B';
+      if (badge.textContent !== step) badge.textContent = step;
+      el.classList.toggle('mv-active', st.a !== null);
+      const label = st.a === null ? 'Repeat from A' : st.b === null ? 'Set point B' : 'Stop repeating';
+      if (el.getAttribute('aria-label') !== label) {
+        el.setAttribute('aria-label', label);
+        el.title = label;
+      }
+    },
+  };
+};
+
+/** Theater mode: the page widens the player (the page listens to the mv-theater event). */
+const theater: ControlFactory = ({ ui }) => {
+  const el = button('mv-theater', 'Theater mode', icons.theater);
+  el.addEventListener('click', () => ui?.toggleTheater?.());
+  return {
+    el,
+    update: () => {
+      const on = ui?.theaterOn?.() ?? false;
+      setIcon(el, on ? icons.theaterExit : icons.theater, on ? 'Default view' : 'Theater mode');
+      el.classList.toggle('mv-active', on);
+    },
+  };
+};
+
 const settings: ControlFactory = ({ ui }) => {
   const el = button('mv-settings-btn', 'Player settings', icons.settings);
   el.setAttribute('aria-haspopup', 'dialog');
@@ -286,6 +364,9 @@ export const controlRegistry = new Map<ControlId | string, ControlFactory>([
   ['quality', quality],
   ['settings', settings],
   ['pip', pip],
+  ['theater', theater],
+  ['captions', captions],
+  ['loop', loop],
   ['fullscreen', fullscreen],
 ]);
 

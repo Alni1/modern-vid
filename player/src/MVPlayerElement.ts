@@ -8,6 +8,9 @@ import { PLAYER_CSS, themeVariables } from './ui/styles';
 import { icons } from './ui/icons';
 import { buildKeyMap, runAction } from './hotkeys';
 import { storage } from './storage';
+import { formatTime } from './ui/format';
+import { CaptionsView, type SubtitleTrack } from './ui/captions';
+import { chapterIndexAt, normalizeChapters, type Chapter } from './ui/chapters';
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -51,14 +54,22 @@ function parseJson<T>(value: string | null): T | null {
  *  - thumbnails    URL of a WebVTT track with seek-bar preview frames (sprite sheets)
  *  - preview       boolean: preview mode (e.g. the channel theme editor) — the viewer's
  *                  stored settings are neither applied nor changed
+ *  - resume-key    identifier of the video: the playback position is remembered under it
+ *                  and playback continues from it next time (behavior.resume)
+ *  - subtitles     JSON [{ lang, label, src }]: WebVTT subtitle tracks (drawn by the player)
+ *  - chapters      JSON [{ start, title }]: chapters shown on the seek bar and next to the time
+ *  - next-url, next-title  the next video: opened after a countdown when this one ends
+ *                  (behavior.autoplayNext)
  *
  * Events:
  *  - mv-ready          metadata loaded
  *  - mv-preset-change  the viewer changed a setting; detail.preset is the new viewer preset
  *                      (the page can save it on the server)
+ *  - mv-theater        theater mode was switched; detail.on (the page widens the player)
+ *  - mv-next           cancelable, before opening next-url; detail.url
  */
 export class MVPlayerElement extends HTMLElement {
-  static observedAttributes = ['src', 'fallback-src', 'poster', 'author-theme', 'preset', 'thumbnails'];
+  static observedAttributes = ['src', 'fallback-src', 'poster', 'author-theme', 'preset', 'thumbnails', 'subtitles', 'chapters'];
 
   private shadow: ShadowRoot;
   private video!: HTMLVideoElement;
@@ -75,6 +86,8 @@ export class MVPlayerElement extends HTMLElement {
     error: HTMLDivElement;
     progressSlot: HTMLDivElement;
     stats: HTMLDivElement;
+    toast: HTMLDivElement;
+    next: HTMLDivElement;
   };
   private settings!: SettingsPanel;
   private keyMap = new Map<string, string>();
@@ -85,6 +98,15 @@ export class MVPlayerElement extends HTMLElement {
   private viewerPreset: ViewerPreset | null = null;
   private lastPaused: boolean | null = null;
   private lastSaved: { volume: number; muted: boolean; rate: number } | null = null;
+  private lastEnded = false;
+  private lastPositionSave = 0;
+  private toastTimer = 0;
+  private nextTimer = 0;
+  private captions = new CaptionsView();
+  private chapters: Chapter[] = [];
+  private loopA: number | null = null;
+  private loopB: number | null = null;
+  private lastCaptionLang: string | null = null;
 
   constructor() {
     super();
@@ -116,6 +138,9 @@ export class MVPlayerElement extends HTMLElement {
   disconnectedCallback(): void {
     window.clearTimeout(this.idleTimer);
     window.clearInterval(this.statsTimer);
+    window.clearTimeout(this.toastTimer);
+    this.cancelNext();
+    if (this._core) this.savePosition(this._core.state);
     if (this._core) storage.saveThroughput(this._core.throughput);
   }
 
@@ -124,6 +149,8 @@ export class MVPlayerElement extends HTMLElement {
     if (name === 'src' && value) void this.loadSource(value);
     if (name === 'poster') this.video.poster = value ?? '';
     if (name === 'thumbnails') this.progress?.setThumbnails(value);
+    if (name === 'subtitles') this.loadSubtitles();
+    if (name === 'chapters') this.loadChapters();
     if (name === 'preset') {
       const p = parseJson<ViewerPreset>(value);
       if (p && Object.keys(p).length) this.setViewerPreset(p);
@@ -165,6 +192,77 @@ export class MVPlayerElement extends HTMLElement {
     storage.savePreset(preset);
     this.applyConfig();
     this.dispatchEvent(new CustomEvent('mv-preset-change', { detail: { preset }, bubbles: true }));
+  }
+
+  /** Switches theater mode (a wider player on the watch page). */
+  toggleTheater(force?: boolean): void {
+    const on = force ?? !this.hasAttribute('theater');
+    this.toggleAttribute('theater', on);
+    if (!this.hasAttribute('preview')) storage.savePref('theater', on);
+    this.dispatchEvent(new CustomEvent('mv-theater', { detail: { on }, bubbles: true }));
+    if (this._core) this.render(this._core.state);
+  }
+
+  /** Shows the subtitles in `lang` (null hides them) and remembers the choice in the viewer preset. */
+  selectCaptions(lang: string | null): void {
+    if (lang) this.lastCaptionLang = lang;
+    this.captions.select(lang);
+    this.updatePreset(withPath(this.getViewerPreset() as Record<string, unknown>, ['subtitles', 'lang'], lang ?? undefined) as ViewerPreset);
+  }
+
+  /** Subtitles on / off (hotkey C): the last used language or the first track. */
+  toggleCaptions(): void {
+    const tracks = this.captions.available;
+    if (!tracks.length) {
+      this.showToast('This video has no subtitles');
+      return;
+    }
+    if (this.captions.current) this.selectCaptions(null);
+    else this.selectCaptions(tracks.some((t) => t.lang === this.lastCaptionLang) ? this.lastCaptionLang : tracks[0].lang);
+  }
+
+  /** A-B repeat: set A, then B (the fragment repeats), then clear. */
+  cycleLoop(): void {
+    const core = this._core;
+    if (!core || !core.state.duration) return;
+    const t = core.state.currentTime;
+    if (this.loopA === null) {
+      this.loopA = t;
+    } else if (this.loopB === null) {
+      const a = this.loopA;
+      if (t > a + 0.5) this.loopB = t;
+      else if (t < a - 0.5) [this.loopA, this.loopB] = [t, a];
+      else this.loopB = Math.min(core.state.duration, a + 1);
+      core.seek(this.loopA);
+    } else {
+      this.loopA = this.loopB = null;
+    }
+    this.progress?.setLoop(this.loopA, this.loopB);
+    this.render(core.state);
+  }
+
+  private loadSubtitles(): void {
+    const list = parseJson<SubtitleTrack[]>(this.getAttribute('subtitles'));
+    const tracks = Array.isArray(list)
+      ? list.filter((t) => t && typeof t.src === 'string' && typeof t.lang === 'string').map((t) => ({ lang: t.lang, label: String(t.label || t.lang), src: t.src }))
+      : [];
+    this.captions.setTracks(tracks);
+    const wanted = this._config?.subtitles.lang;
+    if (wanted && !this.captions.current) {
+      // The preferred language, or the first track when the viewer turned subtitles on elsewhere.
+      const track = tracks.find((t) => t.lang === wanted) ?? tracks[0];
+      if (track) {
+        this.lastCaptionLang = track.lang;
+        this.captions.select(track.lang);
+      }
+    }
+    if (this._core) this.render(this._core.state);
+  }
+
+  private loadChapters(): void {
+    this.chapters = normalizeChapters(parseJson<unknown>(this.getAttribute('chapters')));
+    this.progress?.setChapters(this.chapters);
+    if (this._core) this.render(this._core.state);
   }
 
   /** QoE metrics of the current session (startup time, stalls, switches, bitrate, QoE score). */
@@ -215,6 +313,12 @@ export class MVPlayerElement extends HTMLElement {
     const stats = document.createElement('div');
     stats.className = 'mv-stats';
     stats.hidden = true;
+    const toast = document.createElement('div');
+    toast.className = 'mv-toast';
+    toast.hidden = true;
+    const next = document.createElement('div');
+    next.className = 'mv-next';
+    next.hidden = true;
 
     const controls = document.createElement('div');
     controls.className = 'mv-controls';
@@ -235,7 +339,7 @@ export class MVPlayerElement extends HTMLElement {
       },
     });
 
-    this.shadow.append(style, this.video, overlay, error, stats, controls, this.settings.el);
+    this.shadow.append(style, this.video, this.captions.el, overlay, error, stats, toast, next, controls, this.settings.el);
     this.els = {
       bar: controls.querySelector('.mv-bar') as HTMLDivElement,
       left: controls.querySelector('.mv-left') as HTMLDivElement,
@@ -245,6 +349,8 @@ export class MVPlayerElement extends HTMLElement {
       error,
       progressSlot: controls.querySelector('.mv-progress-slot') as HTMLDivElement,
       stats,
+      toast,
+      next,
     };
 
     const core = new PlayerCore(this.video, this);
@@ -278,10 +384,14 @@ export class MVPlayerElement extends HTMLElement {
     }
     this.applyConfig();
     this.restorePrefs();
+    if (!this.hasAttribute('preview') && storage.loadPrefs().theater) this.setAttribute('theater', '');
+    this.loadSubtitles();
+    this.loadChapters();
     this.lastSaved = { volume: this.video.volume, muted: this.video.muted, rate: this.video.playbackRate };
 
     core.bus.on('state', (s) => this.render(s));
     core.bus.on('ready', (s) => {
+      this.maybeResume(s);
       this.render(s);
       this.dispatchEvent(new CustomEvent('mv-ready', { detail: s }));
     });
@@ -366,6 +476,7 @@ export class MVPlayerElement extends HTMLElement {
       const at = right.indexOf('fullscreen');
       this._config.layout.right = at >= 0 ? [...right.slice(0, at), 'settings', ...right.slice(at)] : [...right, 'settings'];
     }
+    this.captions.applyStyle(this._config.subtitles);
     const vars = themeVariables(this._config.theme);
     Object.entries(vars).forEach(([k, v]) => this.style.setProperty(k, v));
     this.keyMap = buildKeyMap(this._config.hotkeys);
@@ -382,7 +493,22 @@ export class MVPlayerElement extends HTMLElement {
     const ctx: ControlContext = {
       core: this._core as PlayerCore,
       config: this._config,
-      ui: { toggleSettings: () => this.toggleSettings(), settingsOpen: () => this.settings.isOpen },
+      ui: {
+        toggleSettings: () => this.toggleSettings(),
+        settingsOpen: () => this.settings.isOpen,
+        toggleTheater: () => this.toggleTheater(),
+        theaterOn: () => this.hasAttribute('theater'),
+        captions: {
+          tracks: () => this.captions.available,
+          current: () => this.captions.current,
+          select: (lang) => this.selectCaptions(lang),
+        },
+        loop: { state: () => ({ a: this.loopA, b: this.loopB }), cycle: () => this.cycleLoop() },
+        chapterAt: (t) => {
+          const i = chapterIndexAt(this.chapters, t);
+          return i >= 0 ? this.chapters[i].title : null;
+        },
+      },
     };
     const place = (ids: string[], target: HTMLElement): void => {
       ids.forEach((id) => {
@@ -430,6 +556,99 @@ export class MVPlayerElement extends HTMLElement {
       else this.scheduleIdle();
     }
     this.persistPrefs(s);
+    this.captions.update(s.currentTime);
+    // A-B repeat: back to A when playback reaches B.
+    if (this.loopA !== null && this.loopB !== null && this._core && ((s.currentTime >= this.loopB && !s.paused) || s.ended)) {
+      this._core.seek(this.loopA);
+      if (s.ended) void this._core.play();
+    }
+    this.trackPosition(s);
+    if (s.ended && !this.lastEnded) this.onEnded();
+    if (!s.ended && this.lastEnded) this.cancelNext();
+    this.lastEnded = s.ended;
+  }
+
+  /** Continues the video from the remembered position (not near the start or the end). */
+  private maybeResume(s: PlaybackState): void {
+    const key = this.getAttribute('resume-key');
+    if (!key || this.hasAttribute('preview') || !this._config.behavior.resume || !this._core) return;
+    const pos = storage.loadPosition(key);
+    if (pos < 10 || !s.duration || pos > s.duration - 15 || s.currentTime > 1) return;
+    this._core.seek(pos);
+    const restart = document.createElement('button');
+    restart.type = 'button';
+    restart.textContent = 'Start over';
+    restart.addEventListener('click', () => {
+      this._core?.seek(0);
+      this.els.toast.hidden = true;
+    });
+    this.showToast(`Continuing from ${formatTime(pos)}`, restart);
+  }
+
+  private showToast(text: string, action?: HTMLElement): void {
+    const span = document.createElement('span');
+    span.textContent = text;
+    this.els.toast.replaceChildren(span, ...(action ? [action] : []));
+    this.els.toast.hidden = false;
+    window.clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => (this.els.toast.hidden = true), 6000);
+  }
+
+  /** Remembers the playback position every 5 s (and forgets it when the video is finished). */
+  private trackPosition(s: PlaybackState): void {
+    if (performance.now() - this.lastPositionSave < 5000 && !s.ended && !s.paused) return;
+    this.lastPositionSave = performance.now();
+    this.savePosition(s);
+  }
+
+  private savePosition(s: PlaybackState): void {
+    const key = this.getAttribute('resume-key');
+    if (!key || this.hasAttribute('preview') || !this._config.behavior.resume || !s.duration) return;
+    const done = s.ended || s.currentTime > s.duration - 15;
+    if (done) storage.savePosition(key, 0);
+    else if (s.currentTime >= 10) storage.savePosition(key, s.currentTime);
+  }
+
+  /** Autoplay of the next video: a 5-second countdown that the viewer can cancel. */
+  private onEnded(): void {
+    const url = this.getAttribute('next-url');
+    if (!url || this.hasAttribute('preview') || !this._config.behavior.autoplayNext) return;
+    if (this.loopA !== null && this.loopB !== null) return; // the A-B fragment repeats instead
+    let left = 5;
+    const title = document.createElement('strong');
+    title.textContent = this.getAttribute('next-title') || 'Next video';
+    const label = document.createElement('span');
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', () => this.cancelNext());
+    const now = document.createElement('button');
+    now.type = 'button';
+    now.className = 'mv-next-now';
+    now.textContent = 'Play now';
+    now.addEventListener('click', () => this.openNext(url));
+    const buttons = document.createElement('div');
+    buttons.append(cancel, now);
+    const tick = (): void => {
+      label.textContent = `Up next in ${left} s`;
+      if (left-- <= 0) this.openNext(url);
+      else this.nextTimer = window.setTimeout(tick, 1000);
+    };
+    this.els.next.replaceChildren(label, title, buttons);
+    this.els.next.hidden = false;
+    tick();
+    now.focus();
+  }
+
+  private openNext(url: string): void {
+    this.cancelNext();
+    const ev = new CustomEvent('mv-next', { detail: { url }, bubbles: true, cancelable: true });
+    if (this.dispatchEvent(ev)) window.location.assign(url);
+  }
+
+  private cancelNext(): void {
+    window.clearTimeout(this.nextTimer);
+    if (this.els) this.els.next.hidden = true;
   }
 
   /** Remembers volume/mute and speed changes, whatever caused them (buttons, hotkeys). */

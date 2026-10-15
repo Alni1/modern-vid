@@ -24,7 +24,7 @@ export function findConflicts(hotkeys: HotkeysConfig): string[] {
   return [...seen].filter(([, n]) => n > 1).map(([k]) => k);
 }
 
-export function runAction(action: HotkeyAction, core: PlayerCore, config: PlayerConfig, ui?: { toggleStats(): void; toggleSettings(): void }): void {
+export function runAction(action: HotkeyAction, core: PlayerCore, config: PlayerConfig, ui?: { toggleStats(): void; toggleSettings(): void; toggleTheater?(): void; toggleCaptions?(): void; cycleLoop?(): void }): void {
   const speeds = config.behavior.speeds;
   const rate = core.video.playbackRate;
   switch (action) {
@@ -39,5 +39,8 @@ export function runAction(action: HotkeyAction, core: PlayerCore, config: Player
     case 'speedDown': core.setRate([...speeds].reverse().find((s) => s < rate - 1e-3) ?? rate); break;
     case 'toggleStats': ui?.toggleStats(); break;
     case 'toggleSettings': ui?.toggleSettings(); break;
+    case 'toggleTheater': ui?.toggleTheater?.(); break;
+    case 'toggleCaptions': ui?.toggleCaptions?.(); break;
+    case 'abLoop': ui?.cycleLoop?.(); break;
   }
 }

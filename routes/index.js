@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const optionalVerifyToken = require('../middlewares/optionalVerifyToken');
 const VideoMeta = require('../schemas/VideoMeta');
+const { LISTED } = require('../utils/visibility');
 const recommendations = require('../utils/recommendations');
 
 /** "Popular this week" is shown once at least this many videos were watched in the last 7 days. */
@@ -13,7 +14,7 @@ router.get('/', optionalVerifyToken, async function (req, res) {
   let popular = [];
   try {
     const [latest, popularIds] = await Promise.all([
-      VideoMeta.find({ status: { $ne: 'processing' }, hiddenAt: null })
+      VideoMeta.find({ status: { $ne: 'processing' }, hiddenAt: null, ...LISTED })
         .sort({ uploadedAt: -1 })
         .populate('user', 'username avatarUrl')
         .lean(),
