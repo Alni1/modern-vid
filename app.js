@@ -49,6 +49,12 @@ mongoose.connect(process.env.MONGODB_URL)
 })
 .catch((err) => console.error('MongoDB connection error:', err));
 var app = express();
+// Behind a reverse proxy or tunnel (Cloudflare Tunnel, nginx) the client address comes from
+// X-Forwarded-For: TRUST_PROXY=loopback (tunnel on the same machine) or the number of proxies.
+if (process.env.TRUST_PROXY) {
+  const v = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(v) ? Number(v) : v === 'true' ? true : v);
+}
 
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -58,9 +64,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(sanitize); // no MongoDB operators in request data
 app.use(express.static(path.join(__dirname, 'public')));
-// Media files (videos, thumbnails, avatars) from the local storage driver.
-// Registered before the rate limiter: a single video playback issues many range requests.
-if (storage.name === 'local') app.use('/media', privateMedia, storage.middleware());
+// Media files (videos, thumbnails, avatars): served from the local folder, or proxied/redirected
+// to the S3 bucket. Registered before the rate limiter: a single playback issues many requests.
+app.use('/media', privateMedia, storage.middleware());
 app.use(limiter);
 
 app.use('/', indexRouter);
@@ -103,4 +109,4 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-module.exports = app; // Export only the app instance
+module.exports = app; // Export only the app instance

@@ -1,0 +1,24 @@
+# docker compose up -d                       — the site on http://localhost:3000
+# docker compose --profile tunnel up -d      — plus a public https address through Cloudflare Tunnel
+#                                              (the address is printed in: docker compose logs tunnel)
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      TRUST_PROXY: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - media:/data
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://app:3000
+    depends_on: [app]
+    profiles: [tunnel]
+    restart: unless-stopped
+
+volumes:
+  media:

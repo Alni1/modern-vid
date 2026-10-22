@@ -2,8 +2,6 @@ const logger = require('../logger');
 const express = require('express');
 const router = express.Router();
 
-
-const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const User = require('../schemas/userSchema');
 const { issueSession } = require('../utils/auth');
@@ -89,4 +87,4 @@ router.post('/', registrationLimiter, async function(req, res, next){
     }
 })
 
-module.exports = router;
+module.exports = router;

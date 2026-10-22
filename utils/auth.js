@@ -79,7 +79,7 @@ async function issueSession(req, res, user) {
 }
 
 function clearCookies(res) {
-  const { maxAge, ...opts } = cookieOptions(0); // eslint-disable-line no-unused-vars
+  const { maxAge, ...opts } = cookieOptions(0);
   res.clearCookie(ACCESS_COOKIE, opts);
   res.clearCookie(REFRESH_COOKIE, opts);
 }

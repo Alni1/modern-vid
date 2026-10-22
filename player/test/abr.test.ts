@@ -55,6 +55,14 @@ test('adaptive hybrid: a comfortable buffer absorbs a throughput drop', () => {
   assert.equal(r.chooseLevel(ctx({ currentLevel: 2, buffer: 8, throughput: mbps(2.5) })), 1);
 });
 
+test('adaptive hybrid: a lasting drop is followed one level at a time', () => {
+  const r = new AdaptiveHybridRule();
+  // 1080p at 4 Mbit/s: 5.1 s per 4 s segment; 12 s of buffer allow one more segment but not two
+  // (12 − 2·5.1 + 4 = 5.8 ≥ 4 → keep), with 10 s the next level is taken in advance.
+  assert.equal(r.chooseLevel(ctx({ currentLevel: 3, buffer: 14, throughput: mbps(4) })), 3);
+  assert.equal(r.chooseLevel(ctx({ currentLevel: 3, buffer: 10, throughput: mbps(4) })), 2);
+});
+
 test('adaptive hybrid: first segment uses the throughput candidate', () => {
   const r = new AdaptiveHybridRule();
   assert.equal(r.chooseLevel(ctx({ currentLevel: -1, buffer: 0, throughput: mbps(4) })), 1); // β_min = 0.6 → 2.4 Mbit/s

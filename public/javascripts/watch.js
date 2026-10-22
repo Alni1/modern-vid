@@ -157,8 +157,6 @@
   // ------------------------------------------------------------------ comments
   const list = $('#commentsList');
   if (!list) return;
-  const me = list.dataset.me;
-  const ownerId = list.dataset.owner;
   const count = $('#commentCount');
   const setCount = (n) => {
     count.textContent = String(n);

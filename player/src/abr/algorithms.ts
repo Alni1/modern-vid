@@ -136,8 +136,12 @@ const MODE_PARAMS: Record<AbrMode, ModeParams> = {
  * 4. Up-switch hysteresis: switch up only when B ≥ B_up and at least t_hold seconds of media
  *    were loaded at the current level; one level at a time, but straight to the candidate when
  *    the buffer is almost full (B ≥ B_high), where a wrong decision cannot cause a stall.
+ * 3a. Gradual step-down: if two more segments at the current level would leave less than B_reserve
+ *    (B − 2·r_cur·d/Ĉ + d < B_reserve), switch one level down in advance, so a lasting throughput
+ *    drop is followed level by level instead of a jump to the lowest quality.
  * 5. Buffer as a cushion: with B ≥ B_up a lower candidate does not cause a down-switch by itself;
- *    the level is kept while the guard (3) allows it, so short throughput drops are absorbed.
+ *    the level is kept while the guards allow it, so short throughput drops are absorbed; below
+ *    B_up the quality goes down one level at a time.
  * β_max slightly above 1 lets a full buffer cover a small deficit (as buffer-based rules do);
  * the down-switch guard (3) keeps this safe.
  * The parameters depend on the viewer's mode (balanced / quality / stable / eco).
@@ -168,9 +172,13 @@ export class AdaptiveHybridRule implements AbrAlgorithm {
       for (let i = 0; i <= top; i++) if (B - (levels[i].bitrate * d) / C >= p.reserve) safe = i;
       return Math.min(safe, candidate, current);
     }
+    // 3a. Gradual step-down: when two more segments at the current level would bring the buffer
+    // below the reserve, go one level down now instead of waiting for the guard (3), which
+    // would have to drop several levels at once (a large smoothness penalty).
+    if (candidate < current && B - 2 * downloadTime + d < p.reserve) return Math.max(candidate, current - 1);
     // While the buffer is comfortable the level is kept even if the estimate fell below it:
-    // the buffer absorbs short drops, and the guard (3) still switches down in time.
-    if (candidate < current) return B >= p.upBuffer * ctx.maxBuffer ? current : candidate;
+    // the buffer absorbs short drops, and the guards (3, 3a) still switch down in time.
+    if (candidate < current) return B >= p.upBuffer * ctx.maxBuffer ? current : Math.max(candidate, current - 1);
 
     // 4. Up-switch hysteresis: one level at a time, straight to the candidate with a full buffer.
     if (candidate > current && B >= p.upBuffer * ctx.maxBuffer && ctx.sinceSwitch >= p.holdTime) {

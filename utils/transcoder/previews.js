@@ -68,6 +68,8 @@ function videosWithoutPreviews() {
 
 /** Generates missing previews one video at a time; returns the number of processed videos. */
 async function backfillPreviews(log = console.log) {
+  // Only videos from early local installations lack previews (new ones get them while transcoding).
+  if (storage.name !== 'local') return 0;
   const videos = await videosWithoutPreviews();
   for (const v of videos) {
     try {

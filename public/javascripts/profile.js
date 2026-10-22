@@ -336,6 +336,9 @@
     progress.hidden = false;
     uploadStatus.textContent = 'Uploading…';
 
+    const cfg = await fetch('/upload/config', { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : {}), () => ({}));
+    if (cfg.direct) return directUpload(fileInput.files[0], cfg);
+
     xhr = new XMLHttpRequest();
     xhr.open('POST', '/upload', true);
     xhr.setRequestHeader('Accept', 'application/json');
@@ -378,6 +381,96 @@
     };
     xhr.send(new FormData(form));
   });
+
+  /**
+   * Direct upload to the S3 bucket: the file is cut into parts that are PUT in parallel to
+   * pre-signed URLs; the server signs the parts and finishes the upload.
+   */
+  async function directUpload(file, cfg) {
+    const api = async (method, url, body) => {
+      const r = await fetch(url, { method, headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    };
+    const active = new Set();
+    let cancelled = false;
+    let id = null;
+    xhr = { abort: () => { cancelled = true; active.forEach((x) => x.abort()); if (id) api('DELETE', `/upload/multipart/${id}`).catch(() => {}); } };
+    const fail = (msg) => {
+      xhr = null;
+      submitBtn.disabled = false;
+      progress.hidden = true;
+      uploadStatus.textContent = 'Upload failed: ' + msg;
+    };
+    try {
+      const init = await api('POST', '/upload/multipart', { name: file.name, size: file.size, type: file.type });
+      id = init.id;
+      const total = init.parts;
+      const loaded = new Array(total + 1).fill(0);
+      const started = performance.now();
+      const show = () => {
+        const sum = loaded.reduce((a, b) => a + b, 0);
+        const p = Math.min(100, Math.round((sum / file.size) * 100));
+        const seconds = (performance.now() - started) / 1000;
+        bar.style.width = p + '%';
+        percent.textContent = p + '%' + (seconds > 0.5 ? ` · ${(sum / seconds / 1e6).toFixed(1)} MB/s` : '');
+      };
+      const urls = {};
+      let signing = null;
+      const etags = [];
+      const putPart = (n, attempt = 1) => new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        active.add(x);
+        x.open('PUT', urls[n], true);
+        x.upload.onprogress = (ev) => { loaded[n] = ev.loaded; show(); };
+        x.onload = () => {
+          active.delete(x);
+          const etag = x.getResponseHeader('ETag');
+          if (x.status >= 200 && x.status < 300 && etag) { loaded[n] = Math.min(init.partSize, file.size - (n - 1) * init.partSize); show(); return resolve(etag); }
+          reject(new Error(etag ? `HTTP ${x.status}` : 'the bucket does not expose the ETag header (CORS)'));
+        };
+        x.onerror = () => { active.delete(x); reject(new Error('network error')); };
+        x.onabort = () => { active.delete(x); reject(new Error('cancelled')); };
+        x.send(file.slice((n - 1) * init.partSize, n * init.partSize));
+      }).catch((err) => {
+        if (cancelled || attempt >= 3) throw err;
+        loaded[n] = 0;
+        return putPart(n, attempt + 1); // retry a failed part twice
+      });
+      let next = 1;
+      const worker = async () => {
+        while (next <= total && !cancelled) {
+          const n = next++;
+          while (!urls[n]) {
+            // One request signs the next 50 parts for all parallel workers.
+            if (!signing) {
+              const batch = Array.from({ length: Math.min(50, total - n + 1) }, (_, i) => n + i);
+              signing = api('POST', `/upload/multipart/${id}/urls`, { parts: batch })
+                .then((r) => { Object.assign(urls, r.urls); })
+                .finally(() => { signing = null; });
+            }
+            await signing;
+          }
+          etags.push({ partNumber: n, etag: await putPart(n) });
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, total) }, worker));
+      if (cancelled) return;
+      uploadStatus.textContent = 'Checking the file…';
+      const data = Object.fromEntries(new FormData(form));
+      delete data.video;
+      delete data.subsFile;
+      await api('POST', `/upload/multipart/${id}/complete`, { ...data, parts: etags });
+      xhr = null;
+      uploadStatus.textContent = 'Uploaded! The video is being prepared — it will appear in a moment.';
+      setTimeout(() => location.reload(), 1500);
+    } catch (err) {
+      if (cancelled) { xhr = null; submitBtn.disabled = false; return; }
+      if (id) api('DELETE', `/upload/multipart/${id}`).catch(() => {});
+      fail(err.message);
+    }
+  }
 
   if (wantsUpload) $('[data-open-upload]').click();
 

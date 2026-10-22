@@ -11,7 +11,7 @@ const TIME = /(\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{1,3}/;
 
 /** Converts SRT or WebVTT text to WebVTT and counts the cues. Returns { vtt, cues } or { error }. */
 function toWebVtt(input) {
-  let text = String(input || '').replace(/^﻿/, '').replace(/\r\n?/g, '\n').trim();
+  let text = String(input || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').trim();
   if (!text) return { error: 'The file is empty.' };
   const isVtt = /^WEBVTT/.test(text);
   if (!isVtt) {
